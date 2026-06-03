@@ -24,13 +24,9 @@ import {
   CircleHelpIcon,
 } from "lucide-react";
 import { Logo } from "@/components/logo";
+import { PasskeyRegistrationModal } from "./auth/passkey-registration-modal";
 
 const data = {
-  user: {
-    name: "Barbara",
-    email: "barbara@bloqk.nl",
-    avatar: "/avatars/barbara.jpg",
-  },
   navMain: [
     {
       title: "Dashboard",
@@ -94,6 +90,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
+        <PasskeyRegistrationModal />
         <NavUser user={data.user} />
       </SidebarFooter>
     </Sidebar>

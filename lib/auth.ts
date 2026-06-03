@@ -1,6 +1,7 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import prismadb from "./prismadb";
+import { passkey } from "@better-auth/passkey";
 
 export const auth = betterAuth({
     database: prismaAdapter(prismadb, {
@@ -8,5 +9,8 @@ export const auth = betterAuth({
     }),
     emailAndPassword: {
         enabled: true,
-    }
+    },
+    plugins: [
+        passkey()
+    ]
 });

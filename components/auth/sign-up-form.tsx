@@ -22,22 +22,23 @@ import {
 import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
 
-const loginSchema = z.object({
+const signUpSchema = z.object({
+    name: z.string().min(2, "Name must be at least 2 characters"),
     email: z.email("Enter a valid email address"),
     password: z.string().min(8, "Password must be at least 8 characters"),
 });
 
-type LoginFormValues = z.infer<typeof loginSchema>;
+type SignUpFormValues = z.infer<typeof signUpSchema>;
 
-export function LoginForm({
+export function SignUpForm({
     className,
     ...props
 }: React.ComponentProps<"div">) {
     const router = useRouter();
 
-    const form = useForm<LoginFormValues>({
-        resolver: zodResolver(loginSchema),
-        defaultValues: { email: "", password: "" },
+    const form = useForm<SignUpFormValues>({
+        resolver: zodResolver(signUpSchema),
+        defaultValues: { name: "", email: "", password: "" },
     });
 
     const {
@@ -47,11 +48,12 @@ export function LoginForm({
         setError,
     } = form;
 
-    async function onSubmit(values: LoginFormValues) {
-        await authClient.signIn.email(
+    async function onSubmit(values: SignUpFormValues) {
+        await authClient.signUp.email(
             {
                 email: values.email,
                 password: values.password,
+                name: values.name,
                 callbackURL: "/dashboard",
             },
             {
@@ -69,14 +71,28 @@ export function LoginForm({
         <div className={cn("flex flex-col gap-6", className)} {...props}>
             <Card>
                 <CardHeader>
-                    <CardTitle>Login to your account</CardTitle>
+                    <CardTitle>Create an account</CardTitle>
                     <CardDescription>
-                        Enter your email below to login to your account
+                        Enter your details below to create your account
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
                     <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
                         <FieldGroup>
+                            {/* Name Field */}
+                            <Field data-invalid={!!errors.name}>
+                                <FieldLabel htmlFor="name">Name</FieldLabel>
+                                <Input
+                                    id="name"
+                                    type="text"
+                                    placeholder="John Doe"
+                                    aria-invalid={!!errors.name}
+                                    {...register("name")}
+                                />
+                                <FieldError errors={[errors.name]} />
+                            </Field>
+
+                            {/* Email Field */}
                             <Field data-invalid={!!errors.email}>
                                 <FieldLabel htmlFor="email">Email</FieldLabel>
                                 <Input
@@ -88,13 +104,10 @@ export function LoginForm({
                                 />
                                 <FieldError errors={[errors.email]} />
                             </Field>
+
+                            {/* Password Field */}
                             <Field data-invalid={!!errors.password}>
-                                <div className="flex items-center">
-                                    <FieldLabel htmlFor="password">Password</FieldLabel>
-                                    <a href="#" className="ml-auto inline-block text-sm underline-offset-4 hover:underline">
-                                        Forgot your password?
-                                    </a>
-                                </div>
+                                <FieldLabel htmlFor="password">Password</FieldLabel>
                                 <Input
                                     id="password"
                                     type="password"
@@ -104,14 +117,16 @@ export function LoginForm({
                                 <FieldError errors={[errors.password]} />
                             </Field>
                         </FieldGroup>
+
                         {errors.root && (
                             <p className="text-sm text-destructive">
                                 {errors.root.message}
                             </p>
                         )}
+
                         <div className="flex flex-col gap-2">
                             <Button className="cursor-pointer" type="submit" disabled={isSubmitting}>
-                                {isSubmitting ? "Logging in..." : "Login"}
+                                {isSubmitting ? "Creating account..." : "Sign up"}
                             </Button>
                         </div>
                     </form>
