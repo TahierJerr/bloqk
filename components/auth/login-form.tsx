@@ -110,7 +110,7 @@ export function LoginForm({
                             </p>
                         )}
                         <div className="flex flex-col gap-2">
-                            <Button type="submit" disabled={isSubmitting}>
+                            <Button className="cursor-pointer" type="submit" disabled={isSubmitting}>
                                 {isSubmitting ? "Logging in..." : "Login"}
                             </Button>
                         </div>
