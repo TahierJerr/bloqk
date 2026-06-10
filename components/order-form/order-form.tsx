@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
@@ -50,8 +51,10 @@ import { ProgressBlocks } from "@/components/order-form/progress-blocks";
 import { SignUpForm } from "../auth/sign-up-form";
 import { authClient } from "@/lib/auth-client";
 
-const TOTAL_STEPS = 5;
-const SUMMARY_STEP = 4;
+// 6 form steps (indices 0-5); the summary is the last one. The progress bar
+// shows one extra step because the account step (auth) precedes the form.
+const TOTAL_STEPS = 6;
+const SUMMARY_STEP = 5;
 
 const STEP_META: { title: string; subtitle: string }[] = [
     { title: "Wat voor salon heb je?", subtitle: "Kies wat het beste past." },
@@ -102,6 +105,7 @@ const STEP_FIELDS: Record<number, (keyof OrderFormValues)[]> = {
 };
 
 export function OrderForm() {
+    const router = useRouter();
     const { data: session, isPending } = authClient.useSession();
 
     // 1. Nieuwe state om de initiële laadactie bij te houden
@@ -116,6 +120,10 @@ export function OrderForm() {
 
     const shouldReduceMotion = useReducedMotion();
     const [[step, direction], setStep] = useState<[number, number]>([0, 0]);
+    // Overbruggt het moment tussen succesvolle login en de sessie-refetch
+    const [finishingAuth, setFinishingAuth] = useState(false);
+    // Bij 'Wijzig' vanuit het overzicht gaat de volgende stap terug naar het overzicht
+    const [returnToSummary, setReturnToSummary] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState<string | null>(null);
     const [showSuccess, setShowSuccess] = useState(false);
@@ -155,16 +163,24 @@ export function OrderForm() {
     if (!session) {
         return (
             <div className="mx-auto w-full max-w-xl">
-                <CardHeader className="gap-4 px-0">
+                <CardHeader className="gap-4">
                     <ProgressBlocks current={0} total={TOTAL_STEPS + 1} />
                 </CardHeader>
 
-                <SignUpForm
-                    title="Laten we beginnen met je account"
-                    description="Vul je gegevens in zodat we je workspace veilig kunnen aanmaken en je voortgang kunnen opslaan."
-                    onSuccess={() => window.location.reload()}
-                    className="w-full mt-4"
-                />
+                {finishingAuth ? (
+                    <div className="flex min-h-80 items-center justify-center">
+                        <Loader2 className="size-6 animate-spin text-muted-foreground" />
+                    </div>
+                ) : (
+                    <SignUpForm
+                        title="Laten we beginnen met je account"
+                        description="Vul je gegevens in zodat we je workspace veilig kunnen aanmaken en je voortgang kunnen opslaan."
+                        // Na het inloggen haalt useSession de sessie automatisch
+                        // opnieuw op; tot die tijd tonen we een korte loader
+                        onSuccess={() => setFinishingAuth(true)}
+                        className="w-full mt-4"
+                    />
+                )}
             </div>
         );
     }
@@ -176,7 +192,13 @@ export function OrderForm() {
     async function goNext() {
         const fields = STEP_FIELDS[step];
         const valid = fields ? await trigger(fields) : true;
-        if (valid) paginate(step + 1);
+        if (!valid) return;
+        if (returnToSummary) {
+            setReturnToSummary(false);
+            paginate(SUMMARY_STEP);
+        } else {
+            paginate(Math.min(step + 1, SUMMARY_STEP));
+        }
     }
 
     function skipStep() {
@@ -184,11 +206,27 @@ export function OrderForm() {
         if (fields) {
             fields.forEach((field) => clearErrors(field));
         }
-        paginate(step + 1);
+        if (returnToSummary) {
+            setReturnToSummary(false);
+            paginate(SUMMARY_STEP);
+        } else {
+            paginate(step + 1);
+        }
     }
 
     function goBack() {
+        // Tijdens een 'Wijzig' vanuit het overzicht gaat Terug naar het overzicht
+        if (returnToSummary) {
+            setReturnToSummary(false);
+            paginate(SUMMARY_STEP);
+            return;
+        }
         if (step > 0) paginate(step - 1);
+    }
+
+    function editFromSummary(target: number) {
+        setReturnToSummary(true);
+        paginate(target);
     }
 
     function selectSalonType(value: SalonType) {
@@ -215,8 +253,9 @@ export function OrderForm() {
 
             // Dopamine-hit success animation
             setShowSuccess(true);
+            router.prefetch("/dashboard");
             setTimeout(() => {
-                window.location.href = "/dashboard";
+                router.push("/dashboard");
             }, 2000);
         } catch {
             setSubmitError(
@@ -271,14 +310,20 @@ export function OrderForm() {
             <CardHeader className="gap-4">
                 {/* De +1 is omdat de gebruiker stap 0 (Auth) al heeft gehad */}
                 <ProgressBlocks current={step + 1} total={TOTAL_STEPS + 1} />
-                <div className="flex flex-col gap-1">
+                <motion.div
+                    key={step}
+                    initial={{ opacity: 0, y: shouldReduceMotion ? 0 : 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.25, ease: "easeOut" }}
+                    className="flex flex-col gap-1"
+                >
                     <h2 className="text-2xl font-semibold tracking-tight">
                         {STEP_META[step]?.title}
                     </h2>
                     <p className="text-sm text-muted-foreground">
                         {STEP_META[step]?.subtitle}
                     </p>
-                </div>
+                </motion.div>
             </CardHeader>
 
             <form onSubmit={handleSubmit}>
@@ -351,7 +396,7 @@ export function OrderForm() {
                                     )
                                 ) : (
                                     <>
-                                        Volgende
+                                        {returnToSummary ? "Naar overzicht" : "Volgende"}
                                         <ArrowRight className="ml-2 size-4" />
                                     </>
                                 )}
@@ -501,7 +546,7 @@ export function OrderForm() {
                 );
 
             case SUMMARY_STEP:
-                return <SummaryStep values={values} onEdit={paginate} session={session!} />;
+                return <SummaryStep values={values} onEdit={editFromSummary} session={session!} />;
 
             default:
                 return null;
@@ -518,52 +563,86 @@ function SummaryStep({
     onEdit: (step: number) => void;
     session: { user: { name?: string | null; email?: string | null } };
 }) {
-    const rows: { label: string; value: string; step?: number }[] = [
-        { label: "Type", value: values.salonType || "Niet opgegeven", step: 0 },
-        { label: "Salon", value: values.salonName || "Niet opgegeven", step: 1 },
+    const rows: { label: string; value: string | null; step: number }[] = [
+        { label: "Type", value: values.salonType ?? null, step: 0 },
+        { label: "Salon", value: values.salonName || null, step: 1 },
         {
             label: "Domein",
-            value: values.hasDomain === "yes" && values.customDomain
-                ? values.customDomain
-                : (values.hasDomain === "no" ? "Nieuw domein via Bloqk" : "Niet opgegeven"),
-            step: 2
+            value: values.hasDomain === "yes"
+                ? values.customDomain || null
+                : (values.hasDomain === "no" ? "Nieuw domein via Bloqk" : null),
+            step: 2,
         },
-        { label: "Adres", value: values.address || "Niet opgegeven", step: 3 },
-        { label: "Pakket", value: values.package || "Niet opgegeven", step: 4 },
-        { label: "Naam", value: session.user.name ?? "Niet opgegeven" },
-        { label: "E-mail", value: session.user.email ?? "Niet opgegeven" },
+        { label: "Adres", value: values.address || null, step: 3 },
+        { label: "Pakket", value: values.package ?? null, step: 4 },
+    ];
+
+    const accountRows: { label: string; value: string | null }[] = [
+        { label: "Naam", value: session.user.name || null },
+        { label: "E-mail", value: session.user.email || null },
     ];
 
     return (
-        <div className="w-full overflow-hidden rounded-2xl border bg-card">
-            {rows.map((row, index) => (
-                <div
-                    key={row.label}
-                    className={cn(
-                        "flex items-start gap-4 px-4 py-3",
-                        index !== 0 && "border-t"
-                    )}
-                >
-                    <span className="w-24 shrink-0 text-sm text-muted-foreground">
-                        {row.label}
-                    </span>
-                    <span className="flex-1 text-sm font-medium wrap-break-word">
-                        {row.value}
-                    </span>
-                    {row.step !== undefined ? (
+        <div className="flex w-full flex-col gap-4">
+            <div className="w-full divide-y overflow-hidden rounded-2xl border bg-card">
+                {rows.map((row) => (
+                    <div
+                        key={row.label}
+                        className="flex items-start gap-4 px-4 py-3.5"
+                    >
+                        <span className="w-20 shrink-0 text-sm text-muted-foreground sm:w-24">
+                            {row.label}
+                        </span>
+                        <span
+                            className={cn(
+                                "flex-1 text-sm wrap-break-word",
+                                row.value
+                                    ? "font-medium"
+                                    : "italic text-muted-foreground"
+                            )}
+                        >
+                            {row.value ?? "Niet opgegeven"}
+                        </span>
                         <button
                             type="button"
-                            onClick={() => onEdit(row.step!)}
-                            className="flex shrink-0 cursor-pointer items-center gap-1 text-xs font-medium text-primary hover:underline"
+                            onClick={() => onEdit(row.step)}
+                            aria-label={`${row.label} wijzigen`}
+                            className="flex shrink-0 cursor-pointer items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-primary transition-colors hover:bg-primary/10"
                         >
                             <Pencil className="size-3" />
                             Wijzig
                         </button>
-                    ) : (
-                        <div className="w-13" />
-                    )}
+                    </div>
+                ))}
+            </div>
+
+            <div className="w-full overflow-hidden rounded-2xl border bg-muted/40">
+                <p className="border-b px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Je account
+                </p>
+                <div className="divide-y">
+                    {accountRows.map((row) => (
+                        <div
+                            key={row.label}
+                            className="flex items-start gap-4 px-4 py-3"
+                        >
+                            <span className="w-20 shrink-0 text-sm text-muted-foreground sm:w-24">
+                                {row.label}
+                            </span>
+                            <span
+                                className={cn(
+                                    "flex-1 text-sm wrap-break-word",
+                                    row.value
+                                        ? "font-medium"
+                                        : "italic text-muted-foreground"
+                                )}
+                            >
+                                {row.value ?? "Niet opgegeven"}
+                            </span>
+                        </div>
+                    ))}
                 </div>
-            ))}
+            </div>
         </div>
     );
 }
