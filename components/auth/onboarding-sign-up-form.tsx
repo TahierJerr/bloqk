@@ -23,43 +23,61 @@ import {
 import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
 
-// Update schema: remove password, add optional OTP
-const signUpSchema = z.object({
-    name: z.string().min(2, "Name must be at least 2 characters"),
-    email: z.email("Enter a valid email address"),
-    phone: z
-        .string()
-        .trim()
-        .regex(/^\+?[0-9][0-9 ()-]{7,18}$/, "Vul een geldig telefoonnummer in")
-        .or(z.literal(""))
-        .optional(),
-    otp: z.string().optional(),
-});
+const onboardingSignUpSchema = z
+    .object({
+        name: z.string().min(2, "Vul je naam in"),
+        email: z.email("Vul een geldig e-mailadres in"),
+        phone: z
+            .string()
+            .trim()
+            .regex(/^\+?[0-9][0-9 ()-]{7,18}$/, "Vul een geldig telefoonnummer in")
+            .or(z.literal(""))
+            .optional(),
+        password: z.string().min(8, "Minimaal 8 tekens"),
+        confirmPassword: z.string(),
+        otp: z.string().optional(),
+    })
+    .superRefine((data, ctx) => {
+        if (data.password !== data.confirmPassword) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "De wachtwoorden komen niet overeen",
+                path: ["confirmPassword"],
+            });
+        }
+    });
 
-type SignUpFormValues = z.infer<typeof signUpSchema>;
+type OnboardingSignUpValues = z.infer<typeof onboardingSignUpSchema>;
 
-interface SignUpFormProps {
+interface OnboardingSignUpFormProps {
     email?: string;
     onSuccess?: () => void;
     title?: string;
     description?: string;
 }
 
-export function SignUpForm({
+export function OnboardingSignUpForm({
     email,
-    onSuccess, // <-- Extracted to prevent the console error
+    onSuccess,
     title,
     description,
     className,
     ...props
-}: SignUpFormProps & React.ComponentProps<"div">) {
+}: OnboardingSignUpFormProps & React.ComponentProps<"div">) {
     const router = useRouter();
-    // New state to manage the 2-step flow
+    // 2-stapsflow: gegevens invullen, daarna e-mail verifiëren met OTP
     const [step, setStep] = useState<"details" | "otp">("details");
 
-    const form = useForm<SignUpFormValues>({
-        resolver: zodResolver(signUpSchema),
-        defaultValues: { name: "", email: email ?? "", phone: "", otp: "" },
+    const form = useForm<OnboardingSignUpValues>({
+        resolver: zodResolver(onboardingSignUpSchema),
+        defaultValues: {
+            name: "",
+            email: email ?? "",
+            phone: "",
+            password: "",
+            confirmPassword: "",
+            otp: "",
+        },
     });
 
     const {
@@ -69,32 +87,31 @@ export function SignUpForm({
         setError,
     } = form;
 
-    // Handles Step 1: Requesting the Code
-    async function onSendOtp(values: SignUpFormValues) {
+    // Stap 1: gegevens gevalideerd, verificatiecode aanvragen
+    async function onSendOtp(values: OnboardingSignUpValues) {
         const { error } = await authClient.emailOtp.sendVerificationOtp({
             email: values.email.toLowerCase(),
             type: "sign-in",
-            
         });
 
         if (error) {
             setError("root", {
-                message: error.message || "Failed to send verification code",
+                message: error.message || "De verificatiecode kon niet worden verstuurd",
             });
             return;
         }
 
-        // Move to the next step
         setStep("otp");
     }
 
-    // Handles Step 2: Verifying the Code
-    async function onVerifyOtp(values: SignUpFormValues) {
-        // The email renders the code as "123 456"; strip spaces/non-digits so
-        // typed or copied codes match the 6-digit code stored on the server
+    // Stap 2: OTP verifiëren, daarna het wachtwoord vastleggen zodat de
+    // klant na de onboarding ook met e-mail + wachtwoord kan inloggen
+    async function onVerifyOtp(values: OnboardingSignUpValues) {
+        // De e-mail toont de code als "123 456"; spaties en andere
+        // niet-cijfers strippen zodat de code altijd matcht
         const otp = (values.otp ?? "").replace(/\D/g, "");
         if (otp.length !== 6) {
-            setError("otp", { message: "Enter the 6-digit code sent to your email" });
+            setError("otp", { message: "Vul de 6-cijferige code uit je e-mail in" });
             return;
         }
 
@@ -102,18 +119,30 @@ export function SignUpForm({
             email: values.email.toLowerCase(),
             otp,
             name: values.name,
-            // Extra user field; alleen gebruikt bij eerste registratie
+            // Extra gebruikersveld; alleen gebruikt bij eerste registratie
             phone: values.phone?.trim() || undefined,
         });
 
         if (error) {
             setError("root", {
-                message: "Invalid or expired code. Please try again.",
+                message: "Ongeldige of verlopen code. Probeer het opnieuw.",
             });
             return;
         }
 
-        // Control flow: Either run the callback to continue onboarding or redirect
+        // Wachtwoord koppelen aan het zojuist aangemaakte account. Mislukt
+        // dit, dan kan de klant nog steeds inloggen via e-mailcode, dus we
+        // blokkeren de onboarding er niet op.
+        try {
+            await fetch("/api/account/set-password", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ password: values.password }),
+            });
+        } catch (error) {
+            console.error("Wachtwoord instellen mislukt:", error);
+        }
+
         if (onSuccess) {
             onSuccess();
         } else {
@@ -121,7 +150,6 @@ export function SignUpForm({
         }
     }
 
-    // Dynamic submit handler based on current step
     const onSubmit = step === "details" ? onSendOtp : onVerifyOtp;
 
     return (
@@ -130,12 +158,12 @@ export function SignUpForm({
                 <CardHeader>
                     <CardTitle className="text-xl sm:text-2xl">
                         {step === "details"
-                            ? (title || "Create an account")
+                            ? (title || "Maak je account aan")
                             : "Check je e-mail"}
                     </CardTitle>
                     <CardDescription>
                         {step === "details"
-                            ? (description || "Enter your details below to create your account")
+                            ? (description || "Vul je gegevens in om te beginnen")
                             : `We hebben een beveiligingscode gestuurd naar ${form.getValues("email")}`}
                     </CardDescription>
                 </CardHeader>
@@ -147,7 +175,6 @@ export function SignUpForm({
                         <FieldGroup>
                             {step === "details" && (
                                 <>
-                                    {/* Name Field */}
                                     <Field data-invalid={!!errors.name}>
                                         <FieldLabel htmlFor="name">Naam</FieldLabel>
                                         <Input
@@ -160,7 +187,6 @@ export function SignUpForm({
                                         <FieldError errors={[errors.name]} />
                                     </Field>
 
-                                    {/* Email Field */}
                                     <Field data-invalid={!!errors.email}>
                                         <FieldLabel htmlFor="email">E-mailadres</FieldLabel>
                                         <Input
@@ -174,7 +200,6 @@ export function SignUpForm({
                                         <FieldError errors={[errors.email]} />
                                     </Field>
 
-                                    {/* Phone Field */}
                                     <Field data-invalid={!!errors.phone}>
                                         <FieldLabel htmlFor="phone">Telefoonnummer</FieldLabel>
                                         <Input
@@ -187,26 +212,51 @@ export function SignUpForm({
                                         />
                                         <FieldError errors={[errors.phone]} />
                                     </Field>
+
+                                    <Field data-invalid={!!errors.password}>
+                                        <FieldLabel htmlFor="password">Wachtwoord</FieldLabel>
+                                        <Input
+                                            id="password"
+                                            type="password"
+                                            autoComplete="new-password"
+                                            placeholder="Minimaal 8 tekens"
+                                            aria-invalid={!!errors.password}
+                                            {...register("password")}
+                                        />
+                                        <FieldError errors={[errors.password]} />
+                                    </Field>
+
+                                    <Field data-invalid={!!errors.confirmPassword}>
+                                        <FieldLabel htmlFor="confirmPassword">
+                                            Herhaal wachtwoord
+                                        </FieldLabel>
+                                        <Input
+                                            id="confirmPassword"
+                                            type="password"
+                                            autoComplete="new-password"
+                                            placeholder="Nog een keer, voor de zekerheid"
+                                            aria-invalid={!!errors.confirmPassword}
+                                            {...register("confirmPassword")}
+                                        />
+                                        <FieldError errors={[errors.confirmPassword]} />
+                                    </Field>
                                 </>
                             )}
 
                             {step === "otp" && (
-                                <>
-                                    {/* OTP Field */}
-                                    <Field data-invalid={!!errors.otp}>
-                                        <FieldLabel htmlFor="otp">Verificatiecode</FieldLabel>
-                                        <Input
-                                            id="otp"
-                                            type="text"
-                                            inputMode="numeric"
-                                            autoComplete="one-time-code"
-                                            placeholder="000 000"
-                                            aria-invalid={!!errors.otp}
-                                            {...register("otp")}
-                                        />
-                                        <FieldError errors={[errors.otp]} />
-                                    </Field>
-                                </>
+                                <Field data-invalid={!!errors.otp}>
+                                    <FieldLabel htmlFor="otp">Verificatiecode</FieldLabel>
+                                    <Input
+                                        id="otp"
+                                        type="text"
+                                        inputMode="numeric"
+                                        autoComplete="one-time-code"
+                                        placeholder="000 000"
+                                        aria-invalid={!!errors.otp}
+                                        {...register("otp")}
+                                    />
+                                    <FieldError errors={[errors.otp]} />
+                                </Field>
                             )}
                         </FieldGroup>
 
@@ -229,7 +279,6 @@ export function SignUpForm({
                                         : "Verifiëren en doorgaan"}
                             </Button>
 
-                            {/* Allow user to go back if they made a typo in their email */}
                             {step === "otp" && (
                                 <Button
                                     type="button"
@@ -237,7 +286,7 @@ export function SignUpForm({
                                     onClick={() => setStep("details")}
                                     disabled={isSubmitting}
                                 >
-                                    E-mailadres wijzigen
+                                    Gegevens wijzigen
                                 </Button>
                             )}
                         </div>

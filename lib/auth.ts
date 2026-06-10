@@ -21,6 +21,13 @@ export const auth = betterAuth({
                 required: false,
                 input: true,
             },
+            // input: false zodat clients dit veld nooit zelf kunnen zetten;
+            // superadmin wordt alleen server-side toegekend
+            role: {
+                type: "string",
+                required: false,
+                input: false,
+            },
         },
     },
     plugins: [

@@ -48,7 +48,7 @@ import {
 import { ChoiceBlock } from "@/components/order-form/choice-block";
 import { AddressAutocomplete } from "@/components/order-form/address-autocomplete";
 import { ProgressBlocks } from "@/components/order-form/progress-blocks";
-import { SignUpForm } from "../auth/sign-up-form";
+import { OnboardingSignUpForm } from "../auth/onboarding-sign-up-form";
 import { authClient } from "@/lib/auth-client";
 
 // 6 form steps (indices 0-5); the summary is the last one. The progress bar
@@ -172,7 +172,7 @@ export function OrderForm() {
                         <Loader2 className="size-6 animate-spin text-muted-foreground" />
                     </div>
                 ) : (
-                    <SignUpForm
+                    <OnboardingSignUpForm
                         title="Laten we beginnen met je account"
                         description="Vul je gegevens in zodat we je workspace veilig kunnen aanmaken en je voortgang kunnen opslaan."
                         // Na het inloggen haalt useSession de sessie automatisch

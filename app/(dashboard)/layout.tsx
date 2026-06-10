@@ -20,7 +20,12 @@ export default async function DashboardLayout({
     if (!session) {
         const headersList = await headers();
         const pathname = headersList.get("x-invoke-path") ?? "/dashboard";
-        redirect(`/login?next=${pathname}`);
+        redirect(`/sign-in?next=${pathname}`);
+    }
+
+    // Superadmins horen in het beheerdashboard, niet in een salonomgeving
+    if (session.user.role === "SUPERADMIN") {
+        redirect("/admin");
     }
 
     const staff = await prismadb.staff.findUnique({
@@ -29,8 +34,9 @@ export default async function DashboardLayout({
         },
     });
 
+    // Wel een account maar nog geen salon: onboarding afmaken
     if (!staff) {
-        redirect("/sign-in");
+        redirect("/start");
     }
 
     let order = await prismadb.order.findFirst({

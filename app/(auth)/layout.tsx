@@ -3,7 +3,7 @@ import { ThemeProvider } from "next-themes";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
-export default async function RootLayout({
+export default async function AuthLayout({
     children,
 }: Readonly<{
     children: React.ReactNode;
@@ -13,16 +13,12 @@ export default async function RootLayout({
     });
 
     if (session) {
-        redirect(`/dashboard`);
+        redirect(session.user.role === "SUPERADMIN" ? "/admin" : "/dashboard");
     }
 
     return (
-        <html lang="en" suppressHydrationWarning>
-            <body className="min-h-full flex flex-col">
-                <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
-                    {children}
-                </ThemeProvider>
-            </body>
-        </html>
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
+            {children}
+        </ThemeProvider>
     );
 }
