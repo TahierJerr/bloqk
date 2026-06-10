@@ -4,7 +4,6 @@ import { Logo } from "@/components/logo";
 const links = [
     { href: "/pricing", label: "Prijzen" },
     { href: "/stack", label: "Stack" },
-    { href: "/contact", label: "Contact" },
     { href: "/privacy", label: "Privacy" },
 ];
 

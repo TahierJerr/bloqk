@@ -236,6 +236,14 @@ model Order {
   package   String
   status    OrderStatus @default(PENDING)
 
+  // Preview-URL die we delen zodra de pagina klaar is (status PREVIEW_SENT)
+  previewUrl      String?
+  // Laatste feedback wanneer de klant de preview niet goedkeurt
+  feedbackReason  String?
+  feedbackMessage String?
+  // Mollie-betaling gekoppeld aan deze order
+  molliePaymentId String? @unique
+
   userId    String
   user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -251,4 +259,5 @@ enum OrderStatus {
   APPROVED
   PAID
   ACTIVE
+  CANCELLED
 }

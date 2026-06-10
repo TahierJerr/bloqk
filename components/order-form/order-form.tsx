@@ -561,7 +561,7 @@ function SummaryStep({
 }: {
     values: OrderFormValues;
     onEdit: (step: number) => void;
-    session: { user: { name?: string | null; email?: string | null } };
+    session: { user: { name?: string | null; email?: string | null; phone?: string | null | undefined } };
 }) {
     const rows: { label: string; value: string | null; step: number }[] = [
         { label: "Type", value: values.salonType ?? null, step: 0 },
@@ -580,6 +580,7 @@ function SummaryStep({
     const accountRows: { label: string; value: string | null }[] = [
         { label: "Naam", value: session.user.name || null },
         { label: "E-mail", value: session.user.email || null },
+        { label: "Telefoon", value: session.user.phone || null },
     ];
 
     return (

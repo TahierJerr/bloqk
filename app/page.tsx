@@ -144,7 +144,7 @@ export default function HomePage() {
                             </p>
                             <div className="mt-9 flex flex-wrap items-center justify-center lg:justify-start gap-3">
                                 <Button className="bg-blue-500 hover:bg-blue-600" asChild size="lg">
-                                    <Link href="/contact">Start je gratis proefperiode</Link>
+                                    <Link href="/start">Start je gratis proefperiode</Link>
                                 </Button>
                                 <Button asChild size="lg" variant="outline">
                                     <Link href="/pricing">Bekijk prijzen</Link>
@@ -244,7 +244,7 @@ export default function HomePage() {
                                 </CardContent>
                                 <CardFooter>
                                     <Button asChild className="w-full bg-blue-500 hover:bg-blue-600">
-                                        <Link href="/contact">Kies Abonnement</Link>
+                                        <Link href="/start">Kies Abonnement</Link>
                                     </Button>
                                 </CardFooter>
                             </Card>
@@ -344,7 +344,7 @@ export default function HomePage() {
                         </p>
                         <div className="mt-8">
                             <Button className="bg-blue-500 hover:bg-blue-600" asChild size="lg">
-                                <Link href="/contact">Vraag toegang aan</Link>
+                                <Link href="/start">Vraag toegang aan</Link>
                             </Button>
                         </div>
                     </div>

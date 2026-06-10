@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 
 import { SiteNav } from "@/components/marketing/site-nav";
 import { SiteFooter } from "@/components/marketing/site-footer";
@@ -167,7 +166,7 @@ export default function StackPage() {
               </p>
               <div className="mt-8">
                 <Button asChild>
-                  <Link href="/contact">Stel je vraag</Link>
+                  <a href="mailto:support@bloqk.nl">Stel je vraag</a>
                 </Button>
               </div>
             </div>

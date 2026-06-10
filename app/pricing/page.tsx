@@ -30,7 +30,7 @@ const plans = [
     price: "€29",
     unit: "per maand",
     blurb: "Vast bedrag per maand. Maandelijks opzegbaar.",
-    cta: "Kom in contact",
+    cta: "Aan de slag",
     variant: "default" as const,
     includes: [
       "Boekingen, klanten en agenda",
@@ -46,7 +46,7 @@ const plans = [
     price: "€299",
     unit: "eenmalig + €9/maand hosting",
     blurb: "Je koopt de software één keer. Daarna alleen hosting.",
-    cta: "Kom in contact",
+    cta: "Aan de slag",
     variant: "outline" as const,
     includes: [
       "Boekingen, klanten en agenda",
@@ -151,7 +151,7 @@ export default function PricingPage() {
                   </CardContent>
                   <CardFooter>
                     <Button asChild variant={plan.variant} className="w-full">
-                      <Link href="/contact">{plan.cta}</Link>
+                      <Link href="/start">{plan.cta}</Link>
                     </Button>
                   </CardFooter>
                 </Card>
@@ -179,7 +179,7 @@ export default function PricingPage() {
               </p>
               <div className="mt-6">
                 <Button asChild variant="outline" size="sm">
-                  <Link href="/contact">Vraag ernaar</Link>
+                  <a href="mailto:support@bloqk.nl">Vraag ernaar</a>
                 </Button>
               </div>
             </div>

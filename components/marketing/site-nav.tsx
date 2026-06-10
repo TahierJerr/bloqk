@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 const links = [
   { href: "/pricing", label: "Prijzen" },
   { href: "/stack", label: "Stack" },
-  { href: "/contact", label: "Contact" },
 ];
 
 export function SiteNav() {
@@ -24,7 +23,7 @@ export function SiteNav() {
             ))}
           </div>
           <Button className="bg-blue-500" asChild>
-            <Link href="/contact">Kom in contact</Link>
+            <Link href="/start">Aan de slag</Link>
           </Button>
         </div>
       </nav>

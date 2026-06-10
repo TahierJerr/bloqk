@@ -1,6 +1,8 @@
 import { AppSidebar } from "@/components/app-sidebar";
+import { OrderProgress } from "@/components/onboarding/order-progress";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { auth } from "@/lib/auth";
+import { getMollieClient } from "@/lib/mollie";
 import prismadb from "@/lib/prismadb";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
@@ -29,6 +31,47 @@ export default async function DashboardLayout({
 
     if (!staff) {
         redirect("/sign-in");
+    }
+
+    let order = await prismadb.order.findFirst({
+        where: { userId: session.user.id },
+        orderBy: { createdAt: "desc" },
+    });
+
+    // Vangnet voor als de Mollie-webhook ons niet bereikt (bijv. lokaal):
+    // vraag de betaalstatus zelf op zolang er een betaling openstaat
+    if (
+        order?.status === "APPROVED" &&
+        order.molliePaymentId &&
+        process.env.MOLLIE_API_KEY
+    ) {
+        try {
+            const payment = await getMollieClient().payments.get(order.molliePaymentId);
+            if (payment.status === "paid") {
+                order = await prismadb.order.update({
+                    where: { id: order.id },
+                    data: { status: "PAID" },
+                });
+            }
+        } catch (error) {
+            console.error("Mollie statuscheck mislukt:", error);
+        }
+    }
+
+    // Tot de salon live is (ACTIVE) zien klanten de voortgang in plaats
+    // van het dashboard
+    if (order && order.status !== "ACTIVE") {
+        return (
+            <OrderProgress
+                order={{
+                    id: order.id,
+                    status: order.status,
+                    previewUrl: order.previewUrl,
+                    package: order.package,
+                    salonName: order.salonName,
+                }}
+            />
+        );
     }
 
     return (
