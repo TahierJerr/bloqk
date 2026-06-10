@@ -34,10 +34,8 @@ export default async function RootLayout({
     return (
         <html lang="en" suppressHydrationWarning>
             <body className="min-h-full flex flex-col">
-                <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
                     <AppSidebar staff={staff} variant="inset" />
                     {children}
-                </ThemeProvider>
             </body>
         </html>
     );

@@ -243,7 +243,7 @@ export function OrderForm() {
         setSubmitError(null);
         setSubmitting(true);
         try {
-            const res = await fetch("/api/order", {
+            const res = await fetch("/api/start", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(getValues()),
