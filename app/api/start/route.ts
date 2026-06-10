@@ -4,7 +4,6 @@ import prismadb from "@/lib/prismadb";
 import { mailFrom, transporter } from "@/lib/mail";
 import { orderSchema } from "@/lib/order-schema";
 import { OrderConfirmationEmail } from "@/emails/order-confirmation";
-import { OrderNotificationEmail } from "@/emails/order-notification";
 import { auth } from "@/lib/auth"; 
 
 // Helper function to create a URL-friendly slug (e.g. "Studio Knip" -> "studio-knip")
@@ -108,45 +107,25 @@ export async function POST(req: NextRequest) {
             return { salon, staff, order };
         });
 
-        // 4. Send Emails asynchronously (using the order ID from the transaction)
+        // 4. Bevestiging naar de klant. Support krijgt pas bericht zodra de
+        // intake (wizard of contactverzoek) is afgerond, via /api/order/intake
         try {
-            const [confirmationHtml, notificationHtml] = await Promise.all([
-                render(
-                    OrderConfirmationEmail({
-                        name,
-                        salonName,
-                        salonType,
-                        address,
-                        pkg,
-                    })
-                ),
-                render(
-                    OrderNotificationEmail({
-                        orderId: result.order.id,
-                        name,
-                        email,
-                        salonName,
-                        salonType,
-                        address,
-                        pkg,
-                    })
-                ),
-            ]);
+            const confirmationHtml = await render(
+                OrderConfirmationEmail({
+                    name,
+                    salonName,
+                    salonType,
+                    address,
+                    pkg,
+                })
+            );
 
-            await Promise.all([
-                transporter.sendMail({
-                    from: mailFrom,
-                    to: email,
-                    subject: "Je Bloqk-aanvraag is ontvangen",
-                    html: confirmationHtml,
-                }),
-                transporter.sendMail({
-                    from: mailFrom,
-                    to: "support@bloqk.nl",
-                    subject: `Nieuwe aanvraag: ${salonName}`,
-                    html: notificationHtml,
-                }),
-            ]);
+            await transporter.sendMail({
+                from: mailFrom,
+                to: email,
+                subject: "Je Bloqk-aanvraag is ontvangen",
+                html: confirmationHtml,
+            });
         } catch (mailError) {
             console.error("Order-e-mail kon niet worden verzonden:", mailError);
         }

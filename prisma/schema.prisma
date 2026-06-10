@@ -125,6 +125,41 @@ model Salon {
   staff        Staff[]
   services     Service[]
   appointments Appointment[]
+  settings     SalonSettings?
+}
+
+// ─── SALON SETTINGS (branding + openingstijden uit de intake-wizard) ─────────
+
+model SalonSettings {
+  id             String  @id @default(uuid())
+  logoUrl        String?
+  photoUrls      String[]
+  primaryColor   String?
+  secondaryColor String?
+  accentColor    String?
+  extraInfo      String?
+
+  salonId String @unique
+  salon   Salon  @relation(fields: [salonId], references: [id], onDelete: Cascade)
+
+  openingHours OpeningHours[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model OpeningHours {
+  id        String  @id @default(uuid())
+  // 0 = maandag ... 6 = zondag
+  dayOfWeek Int
+  closed    Boolean @default(false)
+  open      String?
+  close     String?
+
+  settingsId String
+  settings   SalonSettings @relation(fields: [settingsId], references: [id], onDelete: Cascade)
+
+  @@unique([settingsId, dayOfWeek])
 }
 
 // ─── STAFF ───────────────────────────────────────────────────────────────────
@@ -249,6 +284,12 @@ model Order {
   feedbackMessage String?
   // Mollie-betaling gekoppeld aan deze order
   molliePaymentId String? @unique
+
+  // Intake: "wizard" (zelf invullen) of "call" (overleggen)
+  intakeChoice      String?
+  // Gewenste contactmethode bij "call": email | phone | video
+  contactMethod     String?
+  intakeCompletedAt DateTime?
 
   userId    String
   user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)

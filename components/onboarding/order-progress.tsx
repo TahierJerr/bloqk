@@ -5,10 +5,15 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
     Check,
+    ClipboardList,
     ExternalLink,
     Loader2,
+    Mail,
+    MessageCircle,
     PartyPopper,
+    Phone,
     ThumbsUp,
+    Video,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,8 +25,15 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/logo";
+import { ChoiceBlock } from "@/components/order-form/choice-block";
 import { PACKAGE_PRICES, type Package } from "@/lib/order-schema";
+import {
+    CONTACT_METHODS,
+    CONTACT_METHOD_LABELS,
+    type ContactMethod,
+} from "@/lib/intake-schema";
 import { OrderFeedbackForm } from "./order-feedback-form";
+import { IntakeWizard } from "./intake-wizard";
 
 export type OrderProgressInfo = {
     id: string;
@@ -29,6 +41,14 @@ export type OrderProgressInfo = {
     previewUrl: string | null;
     package: string;
     salonName: string;
+    intakeChoice: string | null;
+    contactMethod: string | null;
+};
+
+const CONTACT_METHOD_ICONS: Record<ContactMethod, typeof Mail> = {
+    email: Mail,
+    phone: Phone,
+    video: Video,
 };
 
 const STEPS = [
@@ -52,6 +72,9 @@ export function OrderProgress({ order }: { order: OrderProgressInfo }) {
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [feedbackOpen, setFeedbackOpen] = useState(false);
+    // Intakekeuze bij PENDING: wizard zelf invullen of contact aanvragen
+    const [intakeMode, setIntakeMode] = useState<"choice" | "wizard" | "contact">("choice");
+    const [contactMethod, setContactMethod] = useState<ContactMethod | null>(null);
 
     if (order.status === "CANCELLED") {
         return (
@@ -71,8 +94,42 @@ export function OrderProgress({ order }: { order: OrderProgressInfo }) {
         );
     }
 
+    // Wizard neemt het hele scherm over
+    if (order.status === "PENDING" && !order.intakeChoice && intakeMode === "wizard") {
+        return (
+            <IntakeWizard
+                salonName={order.salonName}
+                onCancel={() => setIntakeMode("choice")}
+                onDone={() => {
+                    setIntakeMode("choice");
+                    router.refresh();
+                }}
+            />
+        );
+    }
+
     const activeStep = ACTIVE_STEP[order.status as keyof typeof ACTIVE_STEP] ?? 1;
     const price = PACKAGE_PRICES[order.package as Package];
+
+    async function requestContact() {
+        if (!contactMethod) {
+            setError("Kies hoe we contact mogen opnemen");
+            return;
+        }
+        setBusy(true);
+        setError(null);
+        const res = await fetch("/api/order/intake", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ choice: "call", contactMethod }),
+        });
+        if (!res.ok) {
+            setError("Er ging iets mis. Probeer het opnieuw.");
+            setBusy(false);
+            return;
+        }
+        router.refresh();
+    }
 
     async function approve() {
         setBusy(true);
@@ -181,14 +238,86 @@ export function OrderProgress({ order }: { order: OrderProgressInfo }) {
                                             transition={{ duration: 0.25, ease: "easeOut" }}
                                             className="mt-3 rounded-2xl border bg-card p-4 sm:p-5"
                                         >
-                                            {order.status === "PENDING" && (
-                                                <p className="text-sm leading-relaxed text-muted-foreground">
-                                                    Je aanvraag is binnen! We nemen binnenkort
-                                                    persoonlijk contact met je op om alles door te
-                                                    nemen en bouwen daarna direct je pagina. Zodra de
-                                                    preview klaarstaat, zie je dat hier.
-                                                </p>
-                                            )}
+                                            {order.status === "PENDING" &&
+                                                (order.intakeChoice === "wizard" ? (
+                                                    <p className="text-sm leading-relaxed text-muted-foreground">
+                                                        Bedankt voor het invullen! We bouwen nu je
+                                                        pagina en sturen je binnen 48 uur een preview
+                                                        ter goedkeuring.
+                                                    </p>
+                                                ) : order.intakeChoice === "call" ? (
+                                                    <p className="text-sm leading-relaxed text-muted-foreground">
+                                                        We nemen binnen 24 uur contact met je op
+                                                        {order.contactMethod
+                                                            ? ` (${CONTACT_METHOD_LABELS[
+                                                                  order.contactMethod as ContactMethod
+                                                              ]?.toLowerCase() ?? order.contactMethod})`
+                                                            : ""}{" "}
+                                                        om alles door te nemen. Daarna gaan we direct
+                                                        voor je aan de slag.
+                                                    </p>
+                                                ) : intakeMode === "contact" ? (
+                                                    <div className="flex flex-col gap-4">
+                                                        <p className="text-sm leading-relaxed text-muted-foreground">
+                                                            Goed plan! Hoe mogen we contact met je
+                                                            opnemen?
+                                                        </p>
+                                                        <div className="flex flex-col gap-2.5">
+                                                            {CONTACT_METHODS.map((method) => (
+                                                                <ChoiceBlock
+                                                                    key={method}
+                                                                    icon={CONTACT_METHOD_ICONS[method]}
+                                                                    label={CONTACT_METHOD_LABELS[method]}
+                                                                    selected={contactMethod === method}
+                                                                    onSelect={() => setContactMethod(method)}
+                                                                />
+                                                            ))}
+                                                        </div>
+                                                        <div className="flex flex-wrap gap-2">
+                                                            <Button
+                                                                onClick={requestContact}
+                                                                disabled={busy}
+                                                                className="cursor-pointer"
+                                                            >
+                                                                {busy ? (
+                                                                    <Loader2 className="mr-2 size-4 animate-spin" />
+                                                                ) : null}
+                                                                Vraag contact aan
+                                                            </Button>
+                                                            <Button
+                                                                variant="ghost"
+                                                                disabled={busy}
+                                                                onClick={() => setIntakeMode("choice")}
+                                                                className="cursor-pointer text-muted-foreground"
+                                                            >
+                                                                Terug
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex flex-col gap-4">
+                                                        <p className="text-sm leading-relaxed text-muted-foreground">
+                                                            Je aanvraag is binnen! Hoe wil je de
+                                                            informatie voor je pagina aanleveren?
+                                                        </p>
+                                                        <div className="flex flex-col gap-2.5">
+                                                            <ChoiceBlock
+                                                                icon={ClipboardList}
+                                                                label="Zelf invullen"
+                                                                description="Doorloop een korte wizard: logo, foto's, kleuren, openingstijden en diensten. Duurt ±5 minuten."
+                                                                selected={false}
+                                                                onSelect={() => setIntakeMode("wizard")}
+                                                            />
+                                                            <ChoiceBlock
+                                                                icon={MessageCircle}
+                                                                label="Liever overleggen"
+                                                                description="We nemen binnen 24 uur contact met je op en nemen alles samen door."
+                                                                selected={false}
+                                                                onSelect={() => setIntakeMode("contact")}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                ))}
 
                                             {order.status === "PREVIEW_SENT" && (
                                                 <div className="flex flex-col gap-4">

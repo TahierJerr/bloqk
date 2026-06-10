@@ -75,6 +75,8 @@ export default async function DashboardLayout({
                     previewUrl: order.previewUrl,
                     package: order.package,
                     salonName: order.salonName,
+                    intakeChoice: order.intakeChoice,
+                    contactMethod: order.contactMethod,
                 }}
             />
         );
