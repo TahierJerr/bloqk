@@ -17,6 +17,7 @@ model User {
   email         String    @unique
   emailVerified Boolean   @default(false)
   image         String?
+  phone         String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   sessions      Session[]
@@ -103,8 +104,8 @@ model Passkey {
 model Salon {
   id        String   @id @default(uuid())
   name      String
-  slug      String   @unique
-  domain    String   @unique
+  slug      String?  @unique
+  domain    String?  @unique
   phone     String?
   email     String?
   address   String?

@@ -14,6 +14,15 @@ export const auth = betterAuth({
     emailAndPassword: {
         enabled: true, // You can leave this enabled if you want to support both, or set to false to enforce purely passwordless
     },
+    user: {
+        additionalFields: {
+            phone: {
+                type: "string",
+                required: false,
+                input: true,
+            },
+        },
+    },
     plugins: [
         passkey(),
         emailOTP({

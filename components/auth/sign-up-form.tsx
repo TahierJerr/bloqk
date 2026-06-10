@@ -27,6 +27,12 @@ import { authClient } from "@/lib/auth-client";
 const signUpSchema = z.object({
     name: z.string().min(2, "Name must be at least 2 characters"),
     email: z.email("Enter a valid email address"),
+    phone: z
+        .string()
+        .trim()
+        .regex(/^\+?[0-9][0-9 ()-]{7,18}$/, "Vul een geldig telefoonnummer in")
+        .or(z.literal(""))
+        .optional(),
     otp: z.string().optional(),
 });
 
@@ -53,7 +59,7 @@ export function SignUpForm({
 
     const form = useForm<SignUpFormValues>({
         resolver: zodResolver(signUpSchema),
-        defaultValues: { name: "", email: email ?? "", otp: "" },
+        defaultValues: { name: "", email: email ?? "", phone: "", otp: "" },
     });
 
     const {
@@ -96,6 +102,8 @@ export function SignUpForm({
             email: values.email.toLowerCase(),
             otp,
             name: values.name,
+            // Extra user field; alleen gebruikt bij eerste registratie
+            phone: values.phone?.trim() || undefined,
         });
 
         if (error) {
@@ -164,6 +172,20 @@ export function SignUpForm({
                                             {...register("email")}
                                         />
                                         <FieldError errors={[errors.email]} />
+                                    </Field>
+
+                                    {/* Phone Field */}
+                                    <Field data-invalid={!!errors.phone}>
+                                        <FieldLabel htmlFor="phone">Telefoonnummer</FieldLabel>
+                                        <Input
+                                            id="phone"
+                                            type="tel"
+                                            autoComplete="tel"
+                                            placeholder="06 12345678"
+                                            aria-invalid={!!errors.phone}
+                                            {...register("phone")}
+                                        />
+                                        <FieldError errors={[errors.phone]} />
                                     </Field>
                                 </>
                             )}

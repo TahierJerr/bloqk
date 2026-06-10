@@ -1,12 +1,12 @@
 import { AppSidebar } from "@/components/app-sidebar";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { auth } from "@/lib/auth";
 import prismadb from "@/lib/prismadb";
-import { ThemeProvider } from "next-themes";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 
-export default async function RootLayout({
+export default async function DashboardLayout({
     children,
 }: Readonly<{
     children: React.ReactNode;
@@ -32,11 +32,14 @@ export default async function RootLayout({
     }
 
     return (
-        <html lang="en" suppressHydrationWarning>
-            <body className="min-h-full flex flex-col">
-                    <AppSidebar staff={staff} variant="inset" />
-                    {children}
-            </body>
-        </html>
+        <SidebarProvider
+            style={{
+                "--sidebar-width": "calc(var(--spacing) * 72)",
+                "--header-height": "calc(var(--spacing) * 12)",
+            } as React.CSSProperties}
+        >
+            <AppSidebar staff={staff} variant="inset" />
+            <SidebarInset>{children}</SidebarInset>
+        </SidebarProvider>
     );
 }

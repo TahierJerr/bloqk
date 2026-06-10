@@ -10,11 +10,19 @@ import { auth } from "@/lib/auth";
 // Helper function to create a URL-friendly slug (e.g. "Studio Knip" -> "studio-knip")
 function slugify(text: string) {
     return text.toString().toLowerCase()
-        .replace(/\s+/g, '-')           
-        .replace(/[^\w\-]+/g, '')       
-        .replace(/\-\-+/g, '-')         
-        .replace(/^-+/, '')             
-        .replace(/-+$/, '');            
+        .replace(/\s+/g, '-')
+        .replace(/[^\w\-]+/g, '')
+        .replace(/\-\-+/g, '-')
+        .replace(/^-+/, '')
+        .replace(/-+$/, '');
+}
+
+// Haalt de woonplaats uit een PDOK-adres ("Straat 12, 1234AB Plaats" -> "Plaats")
+function extractCity(address: string | undefined) {
+    if (!address) return null;
+    const lastPart = address.split(",").pop()?.trim() ?? "";
+    const city = lastPart.replace(/^\d{4}\s?[A-Za-z]{2}\s*/, "").trim();
+    return city || null;
 }
 
 export async function POST(req: NextRequest) {
@@ -28,7 +36,7 @@ export async function POST(req: NextRequest) {
             return Response.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const { id: userId, name, email } = session.user;
+        const { id: userId, name, email, phone } = session.user;
 
         // 2. Validate form payload
         const body = await req.json();
@@ -43,15 +51,20 @@ export async function POST(req: NextRequest) {
 
         const { salonName, salonType, hasDomain, customDomain, address, package: pkg } = parsed.data;
 
-        // Genereer de unieke slug
-        const baseSlug = slugify(salonName);
-        const uniqueSlug = `${baseSlug}-${Math.floor(Math.random() * 10000)}`;
-        
-        // Bepaal het definitieve domein
-        let finalDomain = `${uniqueSlug}.bloqk.nl`;
+        // Alleen bij een eigen domein krijgt de salon een domein en slug;
+        // anders blijven beide leeg tot er een domein wordt gekozen
+        let domain: string | null = null;
+        let slug: string | null = null;
         if (hasDomain === "yes" && customDomain) {
-            // Strip http:// en www. eraf zodat de database mooi schoon blijft
-            finalDomain = customDomain.replace(/^(https?:\/\/)?(www\.)?/, '');
+            // Strip protocol, www. en eventueel pad zodat de database mooi schoon blijft
+            domain = customDomain.trim().toLowerCase()
+                .replace(/^(https?:\/\/)?(www\.)?/, '')
+                .replace(/\/.*$/, '');
+            // De slug is het domein zonder TLD ("mijn-salon.nl" -> "mijn-salon")
+            const withoutTld = domain.includes(".")
+                ? domain.split(".").slice(0, -1).join("-")
+                : domain;
+            slug = slugify(withoutTld) || null;
         }
 
         // 3. Execute the database transaction
@@ -59,9 +72,12 @@ export async function POST(req: NextRequest) {
             const salon = await tx.salon.create({
                 data: {
                     name: salonName,
-                    slug: uniqueSlug,
-                    domain: finalDomain, // Gebruik het nieuwe domein
+                    slug,
+                    domain,
                     address: address,
+                    city: extractCity(address),
+                    email: email,
+                    phone: phone ?? null,
                     ownerId: userId,
                 },
             });
@@ -71,9 +87,10 @@ export async function POST(req: NextRequest) {
                 data: {
                     name: name,
                     email: email,
+                    phone: phone ?? null,
                     role: "OWNER",
                     salonId: salon.id,
-                    userId: userId, 
+                    userId: userId,
                 },
             });
 
