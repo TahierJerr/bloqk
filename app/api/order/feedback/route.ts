@@ -1,8 +1,11 @@
 import { NextRequest } from "next/server";
+import { render } from "@react-email/render";
 import prismadb from "@/lib/prismadb";
 import { getSessionAndLatestOrder } from "@/lib/order";
 import { FEEDBACK_REASON_LABELS, orderFeedbackSchema } from "@/lib/order-schema";
 import { mailFrom, transporter } from "@/lib/mail";
+import { OrderFeedbackEmail } from "@/emails/order-feedback-notification";
+import { siteConfig } from "@/lib/site";
 
 export async function POST(req: NextRequest) {
     try {
@@ -40,18 +43,22 @@ export async function POST(req: NextRequest) {
 
         // Stuur de feedback door naar support; mag de request niet laten falen
         try {
+            const html = await render(
+                OrderFeedbackEmail({
+                    orderId: order.id,
+                    salonName: order.salonName,
+                    customerName: session.user.name,
+                    customerEmail: session.user.email,
+                    reasonLabel: FEEDBACK_REASON_LABELS[reason],
+                    message: message || null,
+                    adminUrl: `${siteConfig.url}/admin/orders/${order.id}`,
+                })
+            );
             await transporter.sendMail({
                 from: mailFrom,
                 to: "support@bloqk.nl",
                 subject: `Preview-feedback: ${order.salonName} (${FEEDBACK_REASON_LABELS[reason]})`,
-                text: [
-                    `Salon: ${order.salonName}`,
-                    `Klant: ${session.user.name} (${session.user.email})`,
-                    `Order: ${order.id}`,
-                    `Reden: ${FEEDBACK_REASON_LABELS[reason]}`,
-                    "",
-                    message || "(geen toelichting)",
-                ].join("\n"),
+                html,
             });
         } catch (mailError) {
             console.error("Feedback-e-mail kon niet worden verzonden:", mailError);

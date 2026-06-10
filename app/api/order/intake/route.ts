@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { render } from "@react-email/render";
 import prismadb from "@/lib/prismadb";
 import { getSessionAndLatestOrder } from "@/lib/order";
 import {
@@ -7,6 +8,9 @@ import {
     intakeSchema,
 } from "@/lib/intake-schema";
 import { mailFrom, transporter } from "@/lib/mail";
+import { ContactRequestEmail } from "@/emails/contact-request-notification";
+import { WizardCompleteEmail } from "@/emails/wizard-complete-notification";
+import { siteConfig } from "@/lib/site";
 
 export async function POST(req: NextRequest) {
     try {
@@ -35,7 +39,7 @@ export async function POST(req: NextRequest) {
         }
 
         const data = parsed.data;
-        const customer = `${session.user.name} (${session.user.email}${session.user.phone ? `, ${session.user.phone}` : ""})`;
+        const adminUrl = `${siteConfig.url}/admin/orders/${order.id}`;
 
         if (data.choice === "call") {
             await prismadb.order.update({
@@ -49,15 +53,19 @@ export async function POST(req: NextRequest) {
 
             await sendSupportMail(
                 `📞 Contactverzoek: ${order.salonName}`,
-                [
-                    `Klant wil overleggen over de aanvraag.`,
-                    ``,
-                    `Gewenste contactmethode: ${CONTACT_METHOD_LABELS[data.contactMethod]}`,
-                    `Klant: ${customer}`,
-                    `Salon: ${order.salonName} (${order.salonType})`,
-                    `Pakket: ${order.package}`,
-                    `Order: ${order.id}`,
-                ].join("\n")
+                await render(
+                    ContactRequestEmail({
+                        orderId: order.id,
+                        salonName: order.salonName,
+                        salonType: order.salonType,
+                        pkg: order.package,
+                        customerName: session.user.name,
+                        customerEmail: session.user.email,
+                        customerPhone: session.user.phone,
+                        methodLabel: CONTACT_METHOD_LABELS[data.contactMethod],
+                        adminUrl,
+                    })
+                )
             );
 
             return Response.json({ message: "Contactverzoek ontvangen" });
@@ -125,44 +133,34 @@ export async function POST(req: NextRequest) {
             });
         });
 
-        const hoursSummary = data.openingHours
-            .map((hour) =>
-                hour.closed
-                    ? `${DAY_NAMES[hour.day]}: gesloten`
-                    : `${DAY_NAMES[hour.day]}: ${hour.open} – ${hour.close}`
-            )
-            .join("\n");
-        const servicesSummary = data.services
-            .map(
-                (service) =>
-                    `- ${service.name} (${service.duration} min, €${(service.price / 100).toFixed(2)})`
-            )
-            .join("\n");
-
         await sendSupportMail(
             `🚀 Wizard ingevuld: ${order.salonName}`,
-            [
-                `De klant heeft de onboarding-wizard afgerond. Tijd om te bouwen!`,
-                ``,
-                `Klant: ${customer}`,
-                `Salon: ${order.salonName} (${order.salonType})`,
-                `Pakket: ${order.package}`,
-                `Order: ${order.id}`,
-                ``,
-                `Logo: ${data.logo ? "geüpload" : "geen"}`,
-                `Foto's: ${data.photos.length}`,
-                `Kleuren: ${data.colors.primary} / ${data.colors.secondary} / ${data.colors.accent}`,
-                ``,
-                `Openingstijden:`,
-                hoursSummary,
-                ``,
-                `Diensten:`,
-                servicesSummary,
-                ``,
-                `Extra info: ${data.extraInfo || "(geen)"}`,
-                ``,
-                `Alle details (incl. afbeeldingen) staan in het admin-dashboard.`,
-            ].join("\n")
+            await render(
+                WizardCompleteEmail({
+                    orderId: order.id,
+                    salonName: order.salonName,
+                    salonType: order.salonType,
+                    pkg: order.package,
+                    customerName: session.user.name,
+                    customerEmail: session.user.email,
+                    customerPhone: session.user.phone,
+                    hasLogo: Boolean(data.logo),
+                    photoCount: data.photos.length,
+                    colors: data.colors,
+                    openingHours: data.openingHours.map((hour) => ({
+                        day: DAY_NAMES[hour.day] ?? `Dag ${hour.day}`,
+                        value: hour.closed ? "Gesloten" : `${hour.open} – ${hour.close}`,
+                    })),
+                    services: data.services.map((service) => ({
+                        name: service.name,
+                        value: `${service.duration} min · €${(service.price / 100)
+                            .toFixed(2)
+                            .replace(".", ",")}`,
+                    })),
+                    extraInfo: data.extraInfo || null,
+                    adminUrl,
+                })
+            )
         );
 
         return Response.json({ message: "Intake afgerond" });
@@ -176,13 +174,13 @@ export async function POST(req: NextRequest) {
 }
 
 // Support-mail mag de request nooit laten falen
-async function sendSupportMail(subject: string, text: string) {
+async function sendSupportMail(subject: string, html: string) {
     try {
         await transporter.sendMail({
             from: mailFrom,
             to: "support@bloqk.nl",
             subject,
-            text,
+            html,
         });
     } catch (mailError) {
         console.error("Support-e-mail kon niet worden verzonden:", mailError);
