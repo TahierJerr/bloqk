@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { PasskeyRegistrationModal } from "./auth/passkey-registration-modal";
+import type { Staff } from "@/prisma/generated/prisma/client";
 
 const data = {
   navMain: [
@@ -62,13 +63,13 @@ const data = {
     },
     {
       title: "Help",
-      url: "#",
+      url: "docs.bloqk.nl",
       icon: <CircleHelpIcon />,
     },
   ],
 };
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+export function AppSidebar({ staff, ...props }: { staff: Staff } & React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
@@ -91,7 +92,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarContent>
       <SidebarFooter>
         <PasskeyRegistrationModal />
-        <NavUser user={data.user} />
+        <NavUser staff={staff} />
       </SidebarFooter>
     </Sidebar>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -22,23 +23,37 @@ import {
 import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
 
+// Update schema: remove password, add optional OTP
 const signUpSchema = z.object({
     name: z.string().min(2, "Name must be at least 2 characters"),
     email: z.email("Enter a valid email address"),
-    password: z.string().min(8, "Password must be at least 8 characters"),
+    otp: z.string().optional(),
 });
 
 type SignUpFormValues = z.infer<typeof signUpSchema>;
 
+interface SignUpFormProps {
+    email?: string;
+    onSuccess?: () => void;
+    title?: string;
+    description?: string;
+}
+
 export function SignUpForm({
+    email,
+    onSuccess, // <-- Extracted to prevent the console error
+    title,
+    description,
     className,
     ...props
-}: React.ComponentProps<"div">) {
+}: SignUpFormProps & React.ComponentProps<"div">) {
     const router = useRouter();
+    // New state to manage the 2-step flow
+    const [step, setStep] = useState<"details" | "otp">("details");
 
     const form = useForm<SignUpFormValues>({
         resolver: zodResolver(signUpSchema),
-        defaultValues: { name: "", email: "", password: "" },
+        defaultValues: { name: "", email: email ?? "", otp: "" },
     });
 
     const {
@@ -48,86 +63,157 @@ export function SignUpForm({
         setError,
     } = form;
 
-    async function onSubmit(values: SignUpFormValues) {
-        await authClient.signUp.email(
-            {
-                email: values.email,
-                password: values.password,
-                name: values.name,
-                callbackURL: "/dashboard",
-            },
-            {
-                onSuccess: () => {
-                    router.push("/dashboard");
-                },
-                onError: (ctx) => {
-                    setError("root", { message: ctx.error.message });
-                },
-            }
-        );
+    // Handles Step 1: Requesting the Code
+    async function onSendOtp(values: SignUpFormValues) {
+        const { error } = await authClient.emailOtp.sendVerificationOtp({
+            email: values.email.toLowerCase(),
+            type: "sign-in",
+            
+        });
+
+        if (error) {
+            setError("root", {
+                message: error.message || "Failed to send verification code",
+            });
+            return;
+        }
+
+        // Move to the next step
+        setStep("otp");
     }
+
+    // Handles Step 2: Verifying the Code
+    async function onVerifyOtp(values: SignUpFormValues) {
+        if (!values.otp || values.otp.length < 6) {
+            setError("otp", { message: "Enter the 6-digit code sent to your email" });
+            return;
+        }
+
+        const { error } = await authClient.signIn.emailOtp({
+            email: values.email.toLowerCase(),
+            otp: values.otp.trim(),
+            name: values.name,
+        });
+
+        if (error) {
+            setError("root", {
+                message: "Invalid or expired code. Please try again.",
+            });
+            return;
+        }
+
+        // Control flow: Either run the callback to continue onboarding or redirect
+        if (onSuccess) {
+            onSuccess();
+        } else {
+            router.push("/dashboard");
+        }
+    }
+
+    // Dynamic submit handler based on current step
+    const onSubmit = step === "details" ? onSendOtp : onVerifyOtp;
 
     return (
         <div className={cn("flex flex-col gap-6", className)} {...props}>
-            <Card>
+            <Card className="border-0 shadow-none bg-transparent sm:border sm:shadow-sm sm:bg-card">
                 <CardHeader>
-                    <CardTitle>Create an account</CardTitle>
+                    <CardTitle className="text-xl sm:text-2xl">
+                        {step === "details"
+                            ? (title || "Create an account")
+                            : "Check je e-mail"}
+                    </CardTitle>
                     <CardDescription>
-                        Enter your details below to create your account
+                        {step === "details"
+                            ? (description || "Enter your details below to create your account")
+                            : `We hebben een beveiligingscode gestuurd naar ${form.getValues("email")}`}
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+                    <form
+                        onSubmit={handleSubmit(onSubmit)}
+                        className="flex flex-col gap-4"
+                    >
                         <FieldGroup>
-                            {/* Name Field */}
-                            <Field data-invalid={!!errors.name}>
-                                <FieldLabel htmlFor="name">Name</FieldLabel>
-                                <Input
-                                    id="name"
-                                    type="text"
-                                    placeholder="John Doe"
-                                    aria-invalid={!!errors.name}
-                                    {...register("name")}
-                                />
-                                <FieldError errors={[errors.name]} />
-                            </Field>
+                            {step === "details" && (
+                                <>
+                                    {/* Name Field */}
+                                    <Field data-invalid={!!errors.name}>
+                                        <FieldLabel htmlFor="name">Naam</FieldLabel>
+                                        <Input
+                                            id="name"
+                                            type="text"
+                                            placeholder="Voor- en achternaam"
+                                            aria-invalid={!!errors.name}
+                                            {...register("name")}
+                                        />
+                                        <FieldError errors={[errors.name]} />
+                                    </Field>
 
-                            {/* Email Field */}
-                            <Field data-invalid={!!errors.email}>
-                                <FieldLabel htmlFor="email">Email</FieldLabel>
-                                <Input
-                                    id="email"
-                                    type="email"
-                                    placeholder="m@example.com"
-                                    aria-invalid={!!errors.email}
-                                    {...register("email")}
-                                />
-                                <FieldError errors={[errors.email]} />
-                            </Field>
+                                    {/* Email Field */}
+                                    <Field data-invalid={!!errors.email}>
+                                        <FieldLabel htmlFor="email">E-mailadres</FieldLabel>
+                                        <Input
+                                            id="email"
+                                            type="email"
+                                            placeholder="jij@salon.nl"
+                                            aria-invalid={!!errors.email}
+                                            disabled={!!email}
+                                            {...register("email")}
+                                        />
+                                        <FieldError errors={[errors.email]} />
+                                    </Field>
+                                </>
+                            )}
 
-                            {/* Password Field */}
-                            <Field data-invalid={!!errors.password}>
-                                <FieldLabel htmlFor="password">Password</FieldLabel>
-                                <Input
-                                    id="password"
-                                    type="password"
-                                    aria-invalid={!!errors.password}
-                                    {...register("password")}
-                                />
-                                <FieldError errors={[errors.password]} />
-                            </Field>
+                            {step === "otp" && (
+                                <>
+                                    {/* OTP Field */}
+                                    <Field data-invalid={!!errors.otp}>
+                                        <FieldLabel htmlFor="otp">Verificatiecode</FieldLabel>
+                                        <Input
+                                            id="otp"
+                                            type="text"
+                                            inputMode="numeric"
+                                            placeholder="000 000"
+                                            aria-invalid={!!errors.otp}
+                                            {...register("otp")}
+                                        />
+                                        <FieldError errors={[errors.otp]} />
+                                    </Field>
+                                </>
+                            )}
                         </FieldGroup>
 
                         {errors.root && (
-                            <p className="text-sm text-destructive">
+                            <p className="text-sm text-destructive font-medium">
                                 {errors.root.message}
                             </p>
                         )}
 
-                        <div className="flex flex-col gap-2">
-                            <Button className="cursor-pointer" type="submit" disabled={isSubmitting}>
-                                {isSubmitting ? "Creating account..." : "Sign up"}
+                        <div className="flex flex-col gap-2 mt-2">
+                            <Button
+                                className="cursor-pointer"
+                                type="submit"
+                                disabled={isSubmitting}
+                            >
+                                {isSubmitting
+                                    ? "Verwerken..."
+                                    : step === "details"
+                                        ? "Verificatiecode sturen"
+                                        : "Verifiëren en doorgaan"}
                             </Button>
+
+                            {/* Allow user to go back if they made a typo in their email */}
+                            {step === "otp" && (
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    onClick={() => setStep("details")}
+                                    disabled={isSubmitting}
+                                >
+                                    E-mailadres wijzigen
+                                </Button>
+                            )}
                         </div>
                     </form>
                 </CardContent>

@@ -9,35 +9,14 @@ datasource db {
   provider = "postgresql"
 }
 
-enum Role {
-  OWNER
-  STAFF
-}
-
-enum AppointmentStatus {
-  PENDING // awaiting confirmation
-  CONFIRMED
-  CANCELLED
-  NO_SHOW
-  COMPLETED
-}
-
-enum PaymentStatus {
-  PENDING
-  PAID
-  REFUNDED
-  FAILED
-}
-
 // ─── AUTH (better-auth generated,  do not touch) ─────────────────────────────
 
 model User {
-  id            String    @id @default(cuid())
+  id            String    @id @default(uuid())
   name          String
   email         String    @unique
   emailVerified Boolean   @default(false)
   image         String?
-  role          Role      @default(OWNER)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   sessions      Session[]
@@ -49,10 +28,11 @@ model User {
   passkeys Passkey[]
 
   @@map("user")
+  orders Order[]
 }
 
 model Session {
-  id        String   @id @default(cuid())
+  id        String   @id @default(uuid())
   expiresAt DateTime
   token     String   @unique
   createdAt DateTime @default(now())
@@ -67,7 +47,7 @@ model Session {
 }
 
 model Account {
-  id                    String    @id @default(cuid())
+  id                    String    @id @default(uuid())
   accountId             String
   providerId            String
   accessToken           String?
@@ -87,7 +67,7 @@ model Account {
 }
 
 model Verification {
-  id         String   @id @default(cuid())
+  id         String   @id @default(uuid())
   identifier String
   value      String
   expiresAt  DateTime
@@ -96,128 +76,6 @@ model Verification {
 
   @@index([identifier])
   @@map("verification")
-}
-
-// ─── SALON ───────────────────────────────────────────────────────────────────
-
-model Salon {
-  id        String   @id @default(cuid())
-  name      String
-  slug      String   @unique
-  phone     String?
-  email     String?
-  address   String?
-  city      String?
-  timezone  String   @default("Europe/Amsterdam")
-  currency  String   @default("EUR")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  apiKey       String        @unique
-  ownerId      String        @unique
-  owner        User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  staff        Staff[]
-  services     Service[]
-  clients      Client[]
-  appointments Appointment[]
-}
-
-// ─── STAFF ───────────────────────────────────────────────────────────────────
-
-model Staff {
-  id           String        @id @default(cuid())
-  name         String
-  email        String?
-  phone        String?
-  color        String        @default("#6366f1")
-  active       Boolean       @default(true)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  salonId      String
-  salon        Salon         @relation(fields: [salonId], references: [id], onDelete: Cascade)
-  // fase 2,  staff login
-  userId       String?       @unique
-  user         User?         @relation(fields: [userId], references: [id])
-  appointments Appointment[]
-  schedules    Schedule[]
-}
-
-model Schedule {
-  id        String  @id @default(cuid())
-  dayOfWeek Int
-  startTime String
-  endTime   String
-  active    Boolean @default(true)
-  staffId   String
-  staff     Staff   @relation(fields: [staffId], references: [id], onDelete: Cascade)
-}
-
-// ─── SERVICES ────────────────────────────────────────────────────────────────
-
-model Service {
-  id           String        @id @default(cuid())
-  name         String
-  description  String?
-  imageUrl     String?
-  duration     Int
-  price        Int
-  active       Boolean       @default(true)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  salonId      String
-  salon        Salon         @relation(fields: [salonId], references: [id], onDelete: Cascade)
-  appointments Appointment[]
-}
-
-// ─── CLIENTS ─────────────────────────────────────────────────────────────────
-
-model Client {
-  id           String        @id @default(cuid())
-  name         String
-  email        String?
-  phone        String?
-  notes        String?
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  salonId      String
-  salon        Salon         @relation(fields: [salonId], references: [id], onDelete: Cascade)
-  appointments Appointment[]
-}
-
-// ─── APPOINTMENTS ─────────────────────────────────────────────────────────────
-
-model Appointment {
-  id        String            @id @default(cuid())
-  startTime DateTime
-  endTime   DateTime
-  status    AppointmentStatus @default(CONFIRMED)
-  notes     String?
-  createdAt DateTime          @default(now())
-  updatedAt DateTime          @updatedAt
-  salonId   String
-  salon     Salon             @relation(fields: [salonId], references: [id], onDelete: Cascade)
-  staffId   String
-  staff     Staff             @relation(fields: [staffId], references: [id])
-  serviceId String
-  service   Service           @relation(fields: [serviceId], references: [id])
-  clientId  String
-  client    Client            @relation(fields: [clientId], references: [id])
-  payment   Payment?
-}
-
-// ─── PAYMENTS ────────────────────────────────────────────────────────────────
-
-model Payment {
-  id            String        @id @default(cuid())
-  amount        Int
-  currency      String        @default("EUR")
-  status        PaymentStatus @default(PENDING)
-  mollieId      String?       @unique
-  paidAt        DateTime?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  appointmentId String        @unique
-  appointment   Appointment   @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
 }
 
 model Passkey {
@@ -237,4 +95,159 @@ model Passkey {
   @@index([userId])
   @@index([credentialID])
   @@map("passkey")
+}
+
+
+// ─── SALON ───────────────────────────────────────────────────────────────────
+
+model Salon {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  domain    String   @unique
+  phone     String?
+  email     String?
+  address   String?
+  city      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ownerId      String        @unique
+  owner        User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  staff        Staff[]
+  services     Service[]
+  appointments Appointment[]
+}
+
+// ─── STAFF ───────────────────────────────────────────────────────────────────
+
+enum Role {
+  OWNER
+  ADMIN
+  STAFF
+}
+
+model Staff {
+  id           String        @id @default(uuid())
+  name         String
+  email        String?
+  phone        String?
+  imageUrl     String?
+  color        String        @default("#6366f1")
+  active       Boolean       @default(true)
+  role         Role          @default(STAFF)
+
+  salonId      String
+  salon        Salon         @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  userId       String?       @unique
+  user         User?         @relation(fields: [userId], references: [id])
+
+  appointments Appointment[]
+  schedules    Schedule[]
+
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model Schedule {
+  id        String  @id @default(uuid())
+  dayOfWeek Int
+  startTime String
+  endTime   String
+  active    Boolean @default(true)
+
+  staffId   String
+  staff     Staff   @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([staffId, dayOfWeek])
+}
+
+// ─── SERVICES ────────────────────────────────────────────────────────────────
+
+model Service {
+  id           String        @id @default(uuid())
+  name         String
+  description  String?
+  imageUrl     String?
+  duration     Int
+  price        Int
+  active       Boolean       @default(true)
+
+  salonId      String
+  salon        Salon         @relation(fields: [salonId], references: [id], onDelete: Cascade)
+
+  appointments Appointment[]
+
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+// ─── APPOINTMENTS ─────────────────────────────────────────────────────────────
+
+enum AppointmentStatus {
+  PENDING // awaiting confirmation
+  CONFIRMED
+  CANCELLED
+  NO_SHOW
+  COMPLETED
+}
+
+model Appointment {
+  id              String            @id @default(uuid())
+  startTime       DateTime
+  durationMinutes Int
+  status          AppointmentStatus @default(CONFIRMED)
+  notes           String?
+
+  serviceName     String
+  servicePrice    Int
+
+  clientName      String
+  clientEmail     String
+  clientPhone     String?
+
+  reminder24Sent  Boolean           @default(false)
+  reminder2Sent   Boolean           @default(false)
+
+  salonId         String
+  salon           Salon             @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  staffId         String?
+  staff           Staff?            @relation(fields: [staffId], references: [id], onDelete: SetNull)
+  serviceId       String?
+  service         Service?          @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([salonId, startTime])
+  @@index([staffId, startTime])
+}
+
+model Order {
+  id        String      @id @default(uuid())
+  salonName String
+  salonType String
+  address   String
+  package   String
+  status    OrderStatus @default(PENDING)
+
+  userId    String
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@map("order")
+}
+
+enum OrderStatus {
+  PENDING
+  PREVIEW_SENT
+  APPROVED
+  PAID
+  ACTIVE
 }
