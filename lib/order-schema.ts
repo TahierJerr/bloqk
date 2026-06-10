@@ -10,9 +10,8 @@ export const SALON_TYPES = [
 ] as const;
 
 export const PACKAGES = [
-    "Maandelijks abonnement",
-    "Eenmalig + hosting",
-    "Ik wil eerst even praten",
+    "Wij bouwen het",
+    "Maatwerk"
 ] as const;
 
 export type SalonType = (typeof SALON_TYPES)[number];
@@ -22,9 +21,13 @@ export type Package = (typeof PACKAGES)[number];
 // Mollie ze verwacht). "Eerst praten" heeft geen vaste prijs; daar sturen
 // we een betaallink na het gesprek.
 export const PACKAGE_PRICES: Record<Package, string | null> = {
-    "Maandelijks abonnement": "29.00",
-    "Eenmalig + hosting": "299.00",
-    "Ik wil eerst even praten": null,
+    "Wij bouwen het": "149.00",
+    "Maatwerk": null,
+};
+
+export const SUBSCRIPTION_PRICES = {
+    monthly: "29.00",
+    yearly: "313.00", // 2 months free vs 29 * 12 = 348
 };
 
 export const FEEDBACK_REASONS = [
