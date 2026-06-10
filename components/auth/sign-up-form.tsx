@@ -84,14 +84,17 @@ export function SignUpForm({
 
     // Handles Step 2: Verifying the Code
     async function onVerifyOtp(values: SignUpFormValues) {
-        if (!values.otp || values.otp.length < 6) {
+        // The email renders the code as "123 456"; strip spaces/non-digits so
+        // typed or copied codes match the 6-digit code stored on the server
+        const otp = (values.otp ?? "").replace(/\D/g, "");
+        if (otp.length !== 6) {
             setError("otp", { message: "Enter the 6-digit code sent to your email" });
             return;
         }
 
         const { error } = await authClient.signIn.emailOtp({
             email: values.email.toLowerCase(),
-            otp: values.otp.trim(),
+            otp,
             name: values.name,
         });
 
@@ -174,6 +177,7 @@ export function SignUpForm({
                                             id="otp"
                                             type="text"
                                             inputMode="numeric"
+                                            autoComplete="one-time-code"
                                             placeholder="000 000"
                                             aria-invalid={!!errors.otp}
                                             {...register("otp")}
