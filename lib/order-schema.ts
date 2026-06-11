@@ -76,6 +76,12 @@ export const orderSchema = z.object({
     salonType: z.enum(SALON_TYPES, { message: "Maak een keuze" }),
     hasDomain: z.enum(["yes", "no"], { message: "Maak een keuze" }),
     customDomain: z.string().optional(),
+    // Gekozen suggestie voor een nieuw te registreren domein (optioneel)
+    newDomain: z
+        .string()
+        .regex(/^[a-z0-9]([a-z0-9-]*[a-z0-9])?\.[a-z]{2,}$/, "Ongeldige domeinnaam")
+        .or(z.literal(""))
+        .optional(),
     address: z.string().min(1, "Kies een adres uit de lijst"),
     package: z.enum(PACKAGES, { message: "Maak een keuze" }),
     billing: z.enum(BILLING_OPTIONS, { message: "Maak een keuze" }),

@@ -48,10 +48,10 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        const { salonName, salonType, hasDomain, customDomain, address, package: pkg, billing } = parsed.data;
+        const { salonName, salonType, hasDomain, customDomain, newDomain, address, package: pkg, billing } = parsed.data;
 
-        // Alleen bij een eigen domein krijgt de salon een domein en slug;
-        // anders blijven beide leeg tot er een domein wordt gekozen
+        // Eigen domein of gekozen suggestie krijgt domein + slug; anders
+        // blijven beide leeg tot er een domein wordt gekozen
         let domain: string | null = null;
         let slug: string | null = null;
         if (hasDomain === "yes" && customDomain) {
@@ -59,6 +59,11 @@ export async function POST(req: NextRequest) {
             domain = customDomain.trim().toLowerCase()
                 .replace(/^(https?:\/\/)?(www\.)?/, '')
                 .replace(/\/.*$/, '');
+        } else if (hasDomain === "no" && newDomain) {
+            // Gekozen suggestie voor een nieuw te registreren domein
+            domain = newDomain.trim().toLowerCase();
+        }
+        if (domain) {
             // De slug is het domein zonder TLD ("mijn-salon.nl" -> "mijn-salon")
             const withoutTld = domain.includes(".")
                 ? domain.split(".").slice(0, -1).join("-")

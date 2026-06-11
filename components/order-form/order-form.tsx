@@ -56,6 +56,7 @@ import {
 import { ChoiceBlock } from "@/components/order-form/choice-block";
 import { AddressAutocomplete } from "@/components/order-form/address-autocomplete";
 import { ProgressBlocks } from "@/components/order-form/progress-blocks";
+import type { DomainSuggestion } from "@/lib/domains";
 import { OnboardingSignUpForm } from "../auth/onboarding-sign-up-form";
 import { authClient } from "@/lib/auth-client";
 
@@ -157,6 +158,12 @@ export function OrderForm({ pricing }: { pricing: Pricing }) {
     const [submitting, setSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState<string | null>(null);
     const [showSuccess, setShowSuccess] = useState(false);
+    // Domeinsuggesties (TransIP) voor wie nog geen domein heeft
+    const [domainSuggestions, setDomainSuggestions] = useState<{
+        forName: string;
+        items: DomainSuggestion[];
+    } | null>(null);
+    const [loadingSuggestions, setLoadingSuggestions] = useState(false);
 
     const form = useForm<OrderFormValues>({
         resolver: zodResolver(orderSchema),
@@ -164,6 +171,7 @@ export function OrderForm({ pricing }: { pricing: Pricing }) {
         defaultValues: {
             salonName: "",
             address: "",
+            newDomain: "",
         },
     });
 
@@ -179,6 +187,42 @@ export function OrderForm({ pricing }: { pricing: Pricing }) {
 
     // eslint-disable-next-line react-hooks/incompatible-library
     const values = watch();
+
+    const salonNameValue = values.salonName?.trim() ?? "";
+    const wantsNewDomain = values.hasDomain === "no";
+
+    // Suggesties ophalen zodra 'nog geen domein' gekozen is op de domeinstap
+    useEffect(() => {
+        if (step !== 2 || !wantsNewDomain || salonNameValue.length < 2) return;
+        if (loadingSuggestions || domainSuggestions?.forName === salonNameValue) return;
+
+        let cancelled = false;
+        setLoadingSuggestions(true);
+        fetch("/api/domains/suggest", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ salonName: salonNameValue }),
+        })
+            .then((res) => (res.ok ? res.json() : null))
+            .then((data: { suggestions?: DomainSuggestion[] } | null) => {
+                if (cancelled) return;
+                setDomainSuggestions({
+                    forName: salonNameValue,
+                    items: data?.suggestions ?? [],
+                });
+            })
+            .catch(() => {
+                if (cancelled) return;
+                setDomainSuggestions({ forName: salonNameValue, items: [] });
+            })
+            .finally(() => {
+                if (!cancelled) setLoadingSuggestions(false);
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [step, wantsNewDomain, salonNameValue, loadingSuggestions, domainSuggestions]);
 
     // 3. Gebruik !isAppReady in plaats van isPending om unmount-glitches te voorkomen
     if (!isAppReady) {
@@ -492,13 +536,12 @@ export function OrderForm({ pricing }: { pricing: Pricing }) {
                         <div className="flex flex-col gap-3">
                             <ChoiceBlock
                                 icon={Globe}
-                                label="Nee, ik wil een nieuw domein"
-                                description="Wij regelen een gratis .bloqk.nl domein voor je."
+                                label="Nee, ik heb nog geen domein"
+                                description="Kies hieronder alvast een domeinnaam, of beslis later."
                                 selected={values.hasDomain === "no"}
                                 onSelect={() => {
                                     setValue("hasDomain", "no", { shouldValidate: true });
                                     setValue("customDomain", "");
-                                    setTimeout(() => goNext(), 300);
                                 }}
                             />
                             <ChoiceBlock
@@ -506,12 +549,98 @@ export function OrderForm({ pricing }: { pricing: Pricing }) {
                                 label="Ja, ik heb al een domein"
                                 description="Koppel je bestaande website (bijv. salon.nl)."
                                 selected={values.hasDomain === "yes"}
-                                onSelect={() => setValue("hasDomain", "yes", { shouldValidate: true })}
+                                onSelect={() => {
+                                    setValue("hasDomain", "yes", { shouldValidate: true });
+                                    setValue("newDomain", "");
+                                }}
                             />
                         </div>
                         {errors.hasDomain ? (
                             <p className="text-sm text-destructive">{errors.hasDomain.message}</p>
                         ) : null}
+
+                        {/* Domeinsuggesties op basis van de salonnaam */}
+                        <AnimatePresence>
+                            {values.hasDomain === "no" && (
+                                <motion.div
+                                    initial={{ opacity: 0, height: 0 }}
+                                    animate={{ opacity: 1, height: "auto" }}
+                                    exit={{ opacity: 0, height: 0 }}
+                                    className="overflow-hidden"
+                                >
+                                    <div className="flex flex-col gap-3 pt-2">
+                                        <p className="text-sm font-medium">
+                                            Kies alvast een domeinnaam{" "}
+                                            <span className="font-normal text-muted-foreground">
+                                                (optioneel)
+                                            </span>
+                                        </p>
+                                        {salonNameValue.length < 2 ? (
+                                            <p className="text-sm text-muted-foreground">
+                                                Vul eerst de naam van je salon in, dan doen
+                                                wij een paar suggesties.
+                                            </p>
+                                        ) : loadingSuggestions ? (
+                                            <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
+                                                <Loader2 className="size-4 animate-spin" />
+                                                Beschikbare domeinen zoeken...
+                                            </div>
+                                        ) : (
+                                            <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2 sm:grid-cols-3">
+                                                {(domainSuggestions?.items ?? []).map(
+                                                    (suggestion) => {
+                                                        const isSelected =
+                                                            values.newDomain === suggestion.domain;
+                                                        return (
+                                                            <button
+                                                                key={suggestion.domain}
+                                                                type="button"
+                                                                aria-pressed={isSelected}
+                                                                onClick={() =>
+                                                                    setValue(
+                                                                        "newDomain",
+                                                                        isSelected ? "" : suggestion.domain,
+                                                                        { shouldValidate: true }
+                                                                    )
+                                                                }
+                                                                className={cn(
+                                                                    "flex flex-col items-start gap-1 rounded-xl border-2 px-3 py-2.5 text-left transition-all duration-200 cursor-pointer",
+                                                                    "hover:-translate-y-0.5 hover:shadow-sm motion-reduce:transform-none",
+                                                                    isSelected
+                                                                        ? "border-primary bg-primary/5"
+                                                                        : "border-border bg-card hover:border-primary/40"
+                                                                )}
+                                                            >
+                                                                <span className="w-full truncate text-sm font-medium">
+                                                                    {suggestion.domain}
+                                                                </span>
+                                                                <span
+                                                                    className={cn(
+                                                                        "text-xs",
+                                                                        suggestion.status === "free"
+                                                                            ? "font-medium text-emerald-600"
+                                                                            : "text-muted-foreground"
+                                                                    )}
+                                                                >
+                                                                    {suggestion.status === "free"
+                                                                        ? "✓ beschikbaar"
+                                                                        : "beschikbaarheid onbekend"}
+                                                                </span>
+                                                            </button>
+                                                        );
+                                                    }
+                                                )}
+                                            </div>
+                                        )}
+                                        <p className="text-xs text-muted-foreground">
+                                            Twijfel je of staat je favoriet er niet tussen?
+                                            Sla deze stap gerust over, kiezen kan later ook.
+                                        </p>
+                                        <FieldError errors={[errors.newDomain]} />
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
 
                         <AnimatePresence>
                             {values.hasDomain === "yes" && (
@@ -632,7 +761,11 @@ function SummaryStep({
             label: "Domein",
             value: values.hasDomain === "yes"
                 ? values.customDomain || null
-                : (values.hasDomain === "no" ? "Nieuw domein via Bloqk" : null),
+                : values.hasDomain === "no"
+                    ? values.newDomain
+                        ? `${values.newDomain} (nieuw te registreren)`
+                        : "Kiezen we later samen"
+                    : null,
             step: 2,
         },
         { label: "Adres", value: values.address || null, step: 3 },
