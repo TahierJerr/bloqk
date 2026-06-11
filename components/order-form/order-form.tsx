@@ -5,23 +5,11 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import type { LucideIcon } from "lucide-react";
 import {
     ArrowLeft,
     ArrowRight,
-    BadgePercent,
-    CalendarClock,
-    Flower2,
-    Gem,
-    Hammer,
-    Hand,
     Loader2,
     PartyPopper,
-    Pencil,
-    PenTool,
-    Scissors,
-    Sparkles,
-    Wand2,
     Globe,
     Link as LinkIcon
 } from "lucide-react";
@@ -38,7 +26,6 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import {
     orderSchema,
     SALON_TYPES,
@@ -46,94 +33,25 @@ import {
     type OrderFormValues,
     type Package,
     type SalonType,
-    BILLING_LABELS,
 } from "@/lib/order-schema";
-import {
-    formatEuro,
-    splitWebsiteMonthly,
-    type Pricing,
-} from "@/lib/pricing";
+import type { Pricing } from "@/lib/pricing";
 import { ChoiceBlock } from "@/components/order-form/choice-block";
 import { AddressAutocomplete } from "@/components/order-form/address-autocomplete";
 import { ProgressBlocks } from "@/components/order-form/progress-blocks";
-import type { DomainSuggestion } from "@/lib/domains";
+import { DomainSuggestionPanel } from "@/components/order-form/domain-suggestion-panel";
+import { SummaryStep } from "@/components/order-form/summary-step";
+import { useDomainSuggestions } from "@/components/order-form/use-domain-suggestions";
+import {
+    getBillingOptions,
+    getPackageOptions,
+    SALON_TYPE_ICONS,
+    STEP_FIELDS,
+    STEP_META,
+    SUMMARY_STEP,
+    TOTAL_STEPS,
+} from "@/components/order-form/order-form-config";
 import { OnboardingSignUpForm } from "../auth/onboarding-sign-up-form";
 import { authClient } from "@/lib/auth-client";
-
-// 7 form steps (indices 0-6); the summary is the last one. The progress bar
-// shows one extra step because the account step (auth) precedes the form.
-const TOTAL_STEPS = 7;
-const SUMMARY_STEP = 6;
-
-const STEP_META: { title: string; subtitle: string }[] = [
-    { title: "Wat voor salon heb je?", subtitle: "Kies wat het beste past." },
-    { title: "Hoe heet je salon?", subtitle: "Zo verschijnt je naam straks in Bloqk." },
-    { title: "Heb je al een website?", subtitle: "Koppel je eigen domein of claim een nieuwe." },
-    { title: "Waar zit je salon?", subtitle: "We zoeken je adres op in de database." },
-    { title: "Wie bouwt je website?", subtitle: "Wij bouwen hem voor je, of we maken iets volledig op maat." },
-    { title: "Hoe wil je betalen?", subtitle: "Het abonnement regelt je dashboard en online boekingen." },
-    { title: "Klopt alles?", subtitle: "Controleer je gegevens en verstuur je aanvraag." },
-];
-
-const SALON_TYPE_ICONS: Record<SalonType, LucideIcon> = {
-    "Kapsalons / barbershops": Scissors,
-    "Nagelstudio's": Hand,
-    Schoonheidssalons: Sparkles,
-    Tattooshops: PenTool,
-    "Piercingstudio's": Gem,
-    Massagesalons: Flower2,
-};
-
-function getPackageOptions(pricing: Pricing): {
-    value: Package;
-    description: string;
-    icon: LucideIcon;
-}[] {
-    return [
-        {
-            value: "Wij bouwen het",
-            description: `Wij bouwen je complete salonwebsite, vanaf ${formatEuro(pricing.websiteBase)}.`,
-            icon: Hammer,
-        },
-        {
-            value: "Maatwerk",
-            description: "Iets bijzonders in je hoofd? We maken een voorstel op maat.",
-            icon: Wand2,
-        },
-    ];
-}
-
-function getBillingOptions(pricing: Pricing): {
-    value: Billing;
-    label: string;
-    description: string;
-    icon: LucideIcon;
-}[] {
-    const splitPerMonth = splitWebsiteMonthly(pricing) + pricing.subMonthly;
-    return [
-        {
-            value: "monthly",
-            label: "Maandelijks",
-            description: `${formatEuro(splitPerMonth)}/mnd in jaar 1 (website gespreid + abonnement), daarna ${formatEuro(pricing.subMonthly)}/mnd.`,
-            icon: CalendarClock,
-        },
-        {
-            value: "yearly",
-            label: "Jaarlijks — beste deal",
-            description: `Website in één keer (${formatEuro(pricing.websiteUpfront)}) + ${formatEuro(pricing.subYearly)}/jaar. Dat zijn 2 maanden gratis.`,
-            icon: BadgePercent,
-        },
-    ];
-}
-
-const STEP_FIELDS: Record<number, (keyof OrderFormValues)[]> = {
-    0: ["salonType"],
-    1: ["salonName"],
-    2: ["hasDomain", "customDomain"],
-    3: ["address"],
-    4: ["package"],
-    5: ["billing"],
-};
 
 export function OrderForm({ pricing }: { pricing: Pricing }) {
     const router = useRouter();
@@ -158,12 +76,6 @@ export function OrderForm({ pricing }: { pricing: Pricing }) {
     const [submitting, setSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState<string | null>(null);
     const [showSuccess, setShowSuccess] = useState(false);
-    // Domeinsuggesties (TransIP) voor wie nog geen domein heeft
-    const [domainSuggestions, setDomainSuggestions] = useState<{
-        forName: string;
-        items: DomainSuggestion[];
-    } | null>(null);
-    const [loadingSuggestions, setLoadingSuggestions] = useState(false);
 
     const form = useForm<OrderFormValues>({
         resolver: zodResolver(orderSchema),
@@ -189,40 +101,12 @@ export function OrderForm({ pricing }: { pricing: Pricing }) {
     const values = watch();
 
     const salonNameValue = values.salonName?.trim() ?? "";
-    const wantsNewDomain = values.hasDomain === "no";
 
-    // Suggesties ophalen zodra 'nog geen domein' gekozen is op de domeinstap
-    useEffect(() => {
-        if (step !== 2 || !wantsNewDomain || salonNameValue.length < 2) return;
-        if (loadingSuggestions || domainSuggestions?.forName === salonNameValue) return;
-
-        let cancelled = false;
-        setLoadingSuggestions(true);
-        fetch("/api/domains/suggest", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ salonName: salonNameValue }),
-        })
-            .then((res) => (res.ok ? res.json() : null))
-            .then((data: { suggestions?: DomainSuggestion[] } | null) => {
-                if (cancelled) return;
-                setDomainSuggestions({
-                    forName: salonNameValue,
-                    items: data?.suggestions ?? [],
-                });
-            })
-            .catch(() => {
-                if (cancelled) return;
-                setDomainSuggestions({ forName: salonNameValue, items: [] });
-            })
-            .finally(() => {
-                if (!cancelled) setLoadingSuggestions(false);
-            });
-
-        return () => {
-            cancelled = true;
-        };
-    }, [step, wantsNewDomain, salonNameValue, loadingSuggestions, domainSuggestions]);
+    // Domeinsuggesties (TransIP) voor wie nog geen domein heeft
+    const domainSuggestions = useDomainSuggestions({
+        enabled: step === 2 && values.hasDomain === "no",
+        salonName: salonNameValue,
+    });
 
     // 3. Gebruik !isAppReady in plaats van isPending om unmount-glitches te voorkomen
     if (!isAppReady) {
@@ -568,76 +452,18 @@ export function OrderForm({ pricing }: { pricing: Pricing }) {
                                     exit={{ opacity: 0, height: 0 }}
                                     className="overflow-hidden"
                                 >
-                                    <div className="flex flex-col gap-3 pt-2">
-                                        <p className="text-sm font-medium">
-                                            Kies alvast een domeinnaam{" "}
-                                            <span className="font-normal text-muted-foreground">
-                                                (optioneel)
-                                            </span>
-                                        </p>
-                                        {salonNameValue.length < 2 ? (
-                                            <p className="text-sm text-muted-foreground">
-                                                Vul eerst de naam van je salon in, dan doen
-                                                wij een paar suggesties.
-                                            </p>
-                                        ) : loadingSuggestions ? (
-                                            <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
-                                                <Loader2 className="size-4 animate-spin" />
-                                                Beschikbare domeinen zoeken...
-                                            </div>
-                                        ) : (
-                                            <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2 sm:grid-cols-3">
-                                                {(domainSuggestions?.items ?? []).map(
-                                                    (suggestion) => {
-                                                        const isSelected =
-                                                            values.newDomain === suggestion.domain;
-                                                        return (
-                                                            <button
-                                                                key={suggestion.domain}
-                                                                type="button"
-                                                                aria-pressed={isSelected}
-                                                                onClick={() =>
-                                                                    setValue(
-                                                                        "newDomain",
-                                                                        isSelected ? "" : suggestion.domain,
-                                                                        { shouldValidate: true }
-                                                                    )
-                                                                }
-                                                                className={cn(
-                                                                    "flex flex-col items-start gap-1 rounded-xl border-2 px-3 py-2.5 text-left transition-all duration-200 cursor-pointer",
-                                                                    "hover:-translate-y-0.5 hover:shadow-sm motion-reduce:transform-none",
-                                                                    isSelected
-                                                                        ? "border-primary bg-primary/5"
-                                                                        : "border-border bg-card hover:border-primary/40"
-                                                                )}
-                                                            >
-                                                                <span className="w-full truncate text-sm font-medium">
-                                                                    {suggestion.domain}
-                                                                </span>
-                                                                <span
-                                                                    className={cn(
-                                                                        "text-xs",
-                                                                        suggestion.status === "free"
-                                                                            ? "font-medium text-emerald-600"
-                                                                            : "text-muted-foreground"
-                                                                    )}
-                                                                >
-                                                                    {suggestion.status === "free"
-                                                                        ? "✓ beschikbaar"
-                                                                        : "beschikbaarheid onbekend"}
-                                                                </span>
-                                                            </button>
-                                                        );
-                                                    }
-                                                )}
-                                            </div>
-                                        )}
-                                        <p className="text-xs text-muted-foreground">
-                                            Twijfel je of staat je favoriet er niet tussen?
-                                            Sla deze stap gerust over, kiezen kan later ook.
-                                        </p>
-                                        <FieldError errors={[errors.newDomain]} />
-                                    </div>
+                                    <DomainSuggestionPanel
+                                        salonName={salonNameValue}
+                                        suggestions={domainSuggestions.suggestions}
+                                        loading={domainSuggestions.loading}
+                                        selected={values.newDomain ?? ""}
+                                        onSelect={(domain) =>
+                                            setValue("newDomain", domain, {
+                                                shouldValidate: true,
+                                            })
+                                        }
+                                    />
+                                    <FieldError errors={[errors.newDomain]} />
                                 </motion.div>
                             )}
                         </AnimatePresence>
@@ -743,107 +569,4 @@ export function OrderForm({ pricing }: { pricing: Pricing }) {
                 return null;
         }
     }
-}
-
-function SummaryStep({
-    values,
-    onEdit,
-    session,
-}: {
-    values: OrderFormValues;
-    onEdit: (step: number) => void;
-    session: { user: { name?: string | null; email?: string | null; phone?: string | null | undefined } };
-}) {
-    const rows: { label: string; value: string | null; step: number }[] = [
-        { label: "Type", value: values.salonType ?? null, step: 0 },
-        { label: "Salon", value: values.salonName || null, step: 1 },
-        {
-            label: "Domein",
-            value: values.hasDomain === "yes"
-                ? values.customDomain || null
-                : values.hasDomain === "no"
-                    ? values.newDomain
-                        ? `${values.newDomain} (nieuw te registreren)`
-                        : "Kiezen we later samen"
-                    : null,
-            step: 2,
-        },
-        { label: "Adres", value: values.address || null, step: 3 },
-        { label: "Pakket", value: values.package ?? null, step: 4 },
-        {
-            label: "Betaling",
-            value: values.billing ? BILLING_LABELS[values.billing] : null,
-            step: 5,
-        },
-    ];
-
-    const accountRows: { label: string; value: string | null }[] = [
-        { label: "Naam", value: session.user.name || null },
-        { label: "E-mail", value: session.user.email || null },
-        { label: "Telefoon", value: session.user.phone || null },
-    ];
-
-    return (
-        <div className="flex w-full flex-col gap-4">
-            <div className="w-full divide-y overflow-hidden rounded-2xl border bg-card">
-                {rows.map((row) => (
-                    <div
-                        key={row.label}
-                        className="flex items-start gap-4 px-4 py-3.5"
-                    >
-                        <span className="w-20 shrink-0 text-sm text-muted-foreground sm:w-24">
-                            {row.label}
-                        </span>
-                        <span
-                            className={cn(
-                                "flex-1 text-sm wrap-break-word",
-                                row.value
-                                    ? "font-medium"
-                                    : "italic text-muted-foreground"
-                            )}
-                        >
-                            {row.value ?? "Niet opgegeven"}
-                        </span>
-                        <button
-                            type="button"
-                            onClick={() => onEdit(row.step)}
-                            aria-label={`${row.label} wijzigen`}
-                            className="flex shrink-0 cursor-pointer items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-primary transition-colors hover:bg-primary/10"
-                        >
-                            <Pencil className="size-3" />
-                            Wijzig
-                        </button>
-                    </div>
-                ))}
-            </div>
-
-            <div className="w-full overflow-hidden rounded-2xl border bg-muted/40">
-                <p className="border-b px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Je account
-                </p>
-                <div className="divide-y">
-                    {accountRows.map((row) => (
-                        <div
-                            key={row.label}
-                            className="flex items-start gap-4 px-4 py-3"
-                        >
-                            <span className="w-20 shrink-0 text-sm text-muted-foreground sm:w-24">
-                                {row.label}
-                            </span>
-                            <span
-                                className={cn(
-                                    "flex-1 text-sm wrap-break-word",
-                                    row.value
-                                        ? "font-medium"
-                                        : "italic text-muted-foreground"
-                                )}
-                            >
-                                {row.value ?? "Niet opgegeven"}
-                            </span>
-                        </div>
-                    ))}
-                </div>
-            </div>
-        </div>
-    );
 }

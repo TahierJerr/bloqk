@@ -1,13 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import {
-    ArrowLeft,
-    ExternalLink,
-    Mail,
-    MessageCircle,
-    Phone,
-    Video,
-} from "lucide-react";
+import { ArrowLeft, ExternalLink, MessageCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,15 +8,13 @@ import {
     STATUS_LABELS,
     STATUS_STYLES,
 } from "@/components/admin/order-status";
+import { ContactRequestBanner } from "@/components/admin/contact-request-banner";
+import { DetailSection } from "@/components/admin/detail-section";
 import { OrderActions } from "@/components/admin/order-actions";
+import { OrderWizardData } from "@/components/admin/order-wizard-data";
 import { SlaTimer } from "@/components/admin/sla-timer";
 import { cn } from "@/lib/utils";
 import prismadb from "@/lib/prismadb";
-import {
-    CONTACT_METHOD_LABELS,
-    DAY_NAMES,
-    type ContactMethod,
-} from "@/lib/intake-schema";
 import {
     BILLING_LABELS,
     FEEDBACK_REASON_LABELS,
@@ -39,23 +30,6 @@ const dateFormatter = new Intl.DateTimeFormat("nl-NL", {
     hour: "2-digit",
     minute: "2-digit",
 });
-
-function Section({
-    title,
-    children,
-}: {
-    title: string;
-    children: React.ReactNode;
-}) {
-    return (
-        <section className="rounded-2xl border bg-card p-5">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                {title}
-            </h2>
-            <div className="mt-4">{children}</div>
-        </section>
-    );
-}
 
 export default async function AdminOrderPage({
     params,
@@ -81,15 +55,6 @@ export default async function AdminOrderPage({
         },
     });
     const settings = salon?.settings;
-
-    const contactIcon =
-        order.contactMethod === "phone" ? (
-            <Phone className="size-5" />
-        ) : order.contactMethod === "video" ? (
-            <Video className="size-5" />
-        ) : (
-            <Mail className="size-5" />
-        );
 
     return (
         <main className="mx-auto w-full max-w-4xl px-6 py-10">
@@ -131,43 +96,13 @@ export default async function AdminOrderPage({
             <div className="mt-8 flex flex-col gap-5">
                 {/* Contactverzoek: opvallend bovenaan */}
                 {order.intakeChoice === "call" && (
-                    <section className="rounded-2xl border-2 border-blue-200 bg-blue-50 p-5">
-                        <div className="flex items-start gap-3">
-                            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-700">
-                                {contactIcon}
-                            </span>
-                            <div className="flex flex-col gap-1">
-                                <p className="font-semibold text-blue-900">
-                                    Deze klant wil dat je contact opneemt
-                                    {order.contactMethod
-                                        ? ` — ${CONTACT_METHOD_LABELS[
-                                              order.contactMethod as ContactMethod
-                                          ]?.toLowerCase() ?? order.contactMethod}`
-                                        : ""}
-                                </p>
-                                <p className="text-sm text-blue-900/80">
-                                    {order.user.name} ·{" "}
-                                    <a className="underline" href={`mailto:${order.user.email}`}>
-                                        {order.user.email}
-                                    </a>
-                                    {order.user.phone ? (
-                                        <>
-                                            {" "}·{" "}
-                                            <a className="underline" href={`tel:${order.user.phone}`}>
-                                                {order.user.phone}
-                                            </a>
-                                        </>
-                                    ) : null}
-                                </p>
-                                {order.intakeCompletedAt ? (
-                                    <p className="text-xs text-blue-900/60">
-                                        Aangevraagd op {dateFormatter.format(order.intakeCompletedAt)} —
-                                        beloofd: reactie binnen 24 uur.
-                                    </p>
-                                ) : null}
-                            </div>
-                        </div>
-                    </section>
+                    <ContactRequestBanner
+                        contactMethod={order.contactMethod}
+                        customerName={order.user.name}
+                        customerEmail={order.user.email}
+                        customerPhone={order.user.phone}
+                        requestedAt={order.intakeCompletedAt}
+                    />
                 )}
 
                 {order.intakeChoice === null && (
@@ -177,7 +112,7 @@ export default async function AdminOrderPage({
                     </section>
                 )}
 
-                <Section title="Acties">
+                <DetailSection title="Acties">
                     <OrderActions
                         orderId={order.id}
                         status={order.status}
@@ -197,9 +132,9 @@ export default async function AdminOrderPage({
                             </a>
                         </p>
                     ) : null}
-                </Section>
+                </DetailSection>
 
-                <Section title="Klant">
+                <DetailSection title="Klant">
                     <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
                         <div>
                             <dt className="text-muted-foreground">Naam</dt>
@@ -232,15 +167,15 @@ export default async function AdminOrderPage({
                         </div>
                         {salon?.domain ? (
                             <div>
-                                <dt className="text-muted-foreground">Eigen domein</dt>
+                                <dt className="text-muted-foreground">Domein</dt>
                                 <dd className="font-medium">{salon.domain}</dd>
                             </div>
                         ) : null}
                     </dl>
-                </Section>
+                </DetailSection>
 
                 {order.feedbackReason ? (
-                    <Section title="Laatste feedback op de preview">
+                    <DetailSection title="Laatste feedback op de preview">
                         <p className="text-sm font-medium">
                             {FEEDBACK_REASON_LABELS[order.feedbackReason as FeedbackReason] ??
                                 order.feedbackReason}
@@ -250,128 +185,15 @@ export default async function AdminOrderPage({
                                 {order.feedbackMessage}
                             </p>
                         ) : null}
-                    </Section>
+                    </DetailSection>
                 ) : null}
 
                 {/* Wizardgegevens */}
                 {order.intakeChoice === "wizard" && settings ? (
-                    <>
-                        <Section title="Branding (uit de wizard)">
-                            <div className="flex flex-col gap-5">
-                                <div>
-                                    <p className="mb-2 text-xs text-muted-foreground">Logo</p>
-                                    {settings.logoUrl ? (
-                                        // eslint-disable-next-line @next/next/no-img-element
-                                        <img
-                                            src={settings.logoUrl}
-                                            alt="Logo van de salon"
-                                            className="max-h-32 rounded-xl border bg-background object-contain p-3"
-                                        />
-                                    ) : (
-                                        <p className="text-sm text-muted-foreground">
-                                            Geen logo geüpload — tekstvariant maken.
-                                        </p>
-                                    )}
-                                </div>
-
-                                <div>
-                                    <p className="mb-2 text-xs text-muted-foreground">Kleuren</p>
-                                    <div className="flex gap-3">
-                                        {[
-                                            ["Hoofdkleur", settings.primaryColor],
-                                            ["Tweede kleur", settings.secondaryColor],
-                                            ["Achtergrond", settings.accentColor],
-                                        ].map(([label, color]) =>
-                                            color ? (
-                                                <div key={label} className="flex flex-col items-center gap-1.5">
-                                                    <span
-                                                        className="size-10 rounded-full border"
-                                                        style={{ backgroundColor: color }}
-                                                    />
-                                                    <span className="text-xs text-muted-foreground">
-                                                        {label}
-                                                    </span>
-                                                    <code className="text-[10px] text-muted-foreground">
-                                                        {color}
-                                                    </code>
-                                                </div>
-                                            ) : null
-                                        )}
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <p className="mb-2 text-xs text-muted-foreground">
-                                        Foto&apos;s ({settings.photoUrls.length})
-                                    </p>
-                                    {settings.photoUrls.length > 0 ? (
-                                        <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
-                                            {settings.photoUrls.map((photo, index) => (
-                                                // eslint-disable-next-line @next/next/no-img-element
-                                                <img
-                                                    key={index}
-                                                    src={photo}
-                                                    alt={`Salonfoto ${index + 1}`}
-                                                    className="aspect-square rounded-xl border object-cover"
-                                                />
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <p className="text-sm text-muted-foreground">
-                                            Geen foto&apos;s geüpload.
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-                        </Section>
-
-                        <Section title="Openingstijden">
-                            <div className="divide-y text-sm">
-                                {settings.openingHours.map((hour) => (
-                                    <div
-                                        key={hour.id}
-                                        className="flex items-center justify-between py-2"
-                                    >
-                                        <span className="font-medium">
-                                            {DAY_NAMES[hour.dayOfWeek] ?? `Dag ${hour.dayOfWeek}`}
-                                        </span>
-                                        <span
-                                            className={cn(
-                                                hour.closed
-                                                    ? "text-muted-foreground"
-                                                    : "tabular-nums"
-                                            )}
-                                        >
-                                            {hour.closed ? "Gesloten" : `${hour.open} – ${hour.close}`}
-                                        </span>
-                                    </div>
-                                ))}
-                            </div>
-                        </Section>
-
-                        <Section title={`Diensten (${salon?.services.length ?? 0})`}>
-                            <div className="divide-y text-sm">
-                                {salon?.services.map((service) => (
-                                    <div
-                                        key={service.id}
-                                        className="flex items-center justify-between gap-3 py-2"
-                                    >
-                                        <span className="font-medium">{service.name}</span>
-                                        <span className="shrink-0 text-muted-foreground">
-                                            {service.duration} min · €
-                                            {(service.price / 100).toFixed(2).replace(".", ",")}
-                                        </span>
-                                    </div>
-                                ))}
-                            </div>
-                        </Section>
-
-                        {settings.extraInfo ? (
-                            <Section title="Extra info / wensen">
-                                <p className="whitespace-pre-wrap text-sm">{settings.extraInfo}</p>
-                            </Section>
-                        ) : null}
-                    </>
+                    <OrderWizardData
+                        settings={settings}
+                        services={salon?.services ?? []}
+                    />
                 ) : null}
             </div>
         </main>
