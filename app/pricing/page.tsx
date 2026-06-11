@@ -10,59 +10,26 @@ import {
   CardFooter,
   CardHeader,
 } from "@/components/ui/card";
+import { getPricingConfig } from "@/lib/pricing-server";
+import { formatEuro, splitWebsiteMonthly } from "@/lib/pricing";
 
 export const metadata: Metadata = {
   title: "Prijzen",
   description:
-    "De prijzen van Bloqk: €29 per maand of eenmalig €299. Geen commissie, geen verborgen tiers. Je weet precies waar je voor betaalt.",
+    "De prijzen van Bloqk: je salonwebsite vanaf €149 en een abonnement per maand of per jaar. Geen commissie op boekingen, geen verborgen tiers.",
   alternates: { canonical: "/pricing" },
   openGraph: {
     url: "/pricing",
     title: "Prijzen | Bloqk",
     description:
-      "De prijzen van Bloqk: €29 per maand of eenmalig €299. Geen commissie, geen verborgen tiers.",
+      "Je salonwebsite vanaf €149 en een abonnement per maand of per jaar. Geen commissie op boekingen.",
   },
 };
-
-const plans = [
-  {
-    name: "Abonnement",
-    price: "€29",
-    unit: "per maand",
-    blurb: "Vast bedrag per maand. Maandelijks opzegbaar.",
-    cta: "Aan de slag",
-    variant: "default" as const,
-    includes: [
-      "Boekingen, klanten en agenda",
-      "Onbeperkt aantal afspraken",
-      "Geen commissie op betalingen",
-      "EU-hosting & dagelijkse back-ups",
-      "Updates en support inbegrepen",
-      "Maandelijks opzegbaar",
-    ],
-  },
-  {
-    name: "Eenmalig",
-    price: "€299",
-    unit: "eenmalig + €9/maand hosting",
-    blurb: "Je koopt de software één keer. Daarna alleen hosting.",
-    cta: "Aan de slag",
-    variant: "outline" as const,
-    includes: [
-      "Boekingen, klanten en agenda",
-      "Onbeperkt aantal afspraken",
-      "Geen commissie op betalingen",
-      "€9/maand voor hosting & onderhoud",
-      "Updates inbegrepen",
-      "Je data is en blijft van jou",
-    ],
-  },
-];
 
 const faq = [
   {
     q: "Betaal ik commissie?",
-    a: "Nee. Nooit. Wat je klant betaalt, gaat naar jou. Wij verdienen aan je abonnement of de eenmalige aankoop, niet aan jouw omzet.",
+    a: "Nee. Nooit. Wat je klant betaalt, gaat naar jou. Wij verdienen aan je abonnement en de website, niet aan jouw omzet. 0% commissie op boekingen, elke euro is voor jou.",
   },
   {
     q: "Wat als ik stop?",
@@ -70,15 +37,15 @@ const faq = [
   },
   {
     q: "Is het AVG-proof?",
-    a: "Ja. Bloqk is volledig in Europa gehost, op servers in Duitsland en Nederland. Geen data die ongemerkt naar de VS gaat.",
+    a: "Ja. Je gegevens staan volledig in Europa, op servers van Hetzner in Duitsland. Geen data die ongemerkt naar de VS gaat.",
   },
   {
     q: "Zitten er extra kosten aan?",
     a: "Nee. De prijs die je hier ziet, is de prijs. Geen setup-kosten, geen transactiekosten, geen verrassing op je factuur.",
   },
   {
-    q: "Kan ik later wisselen?",
-    a: "Ja. Begin met een abonnement en koop later eenmalig af, of andersom. Stuur ons een bericht en we regelen het.",
+    q: "Waarom is gespreid betalen iets duurder?",
+    a: "Bij gespreid betalen spreid je de website over 12 maanden zonder dat je vooraf veel hoeft te investeren. Dat gemak zit in de prijs. Betaal je in één keer, dan ben je goedkoper uit.",
   },
 ];
 
@@ -98,7 +65,48 @@ const faqJsonLd = {
 const eyebrow =
   "text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground";
 
-export default function PricingPage() {
+export default async function PricingPage() {
+  // Bedragen komen uit dezelfde configuratie als de checkout, zodat de
+  // site nooit andere prijzen toont dan de klant straks betaalt
+  const pricing = await getPricingConfig();
+  const monthYear1 = splitWebsiteMonthly(pricing) + pricing.subMonthly;
+  const yearOneDeal = pricing.websiteUpfront + pricing.subYearly;
+
+  const plans = [
+    {
+      name: "Maandelijks",
+      price: formatEuro(monthYear1),
+      unit: "per maand in jaar 1",
+      blurb: `Je website (${formatEuro(pricing.websiteSplitTotal)}) gespreid over 12 maanden + abonnement. Daarna nog ${formatEuro(pricing.subMonthly)} per maand.`,
+      cta: "Aan de slag",
+      variant: "default" as const,
+      includes: [
+        "Complete salonwebsite, door ons gebouwd",
+        "Boekingen, klanten en agenda",
+        "0% commissie op boekingen",
+        `Na jaar 1: ${formatEuro(pricing.subMonthly)}/mnd (${formatEuro(pricing.hostingShare)} hosting + ${formatEuro(pricing.softwareShare)} software)`,
+        "EU-hosting & dagelijkse back-ups",
+        "Updates en support inbegrepen",
+      ],
+    },
+    {
+      name: "Jaarlijks — beste deal",
+      price: formatEuro(yearOneDeal),
+      unit: "eerste jaar (website + abonnement)",
+      blurb: `Website in één keer (${formatEuro(pricing.websiteUpfront)}) + jaarabonnement van ${formatEuro(pricing.subYearly)} met 2 maanden gratis.`,
+      cta: "Aan de slag",
+      variant: "outline" as const,
+      includes: [
+        "Complete salonwebsite, door ons gebouwd",
+        "Boekingen, klanten en agenda",
+        "0% commissie op boekingen",
+        `2 maanden gratis t.o.v. maandelijks betalen`,
+        `Na jaar 1: ${formatEuro(pricing.subYearly)}/jaar`,
+        "EU-hosting, updates en support inbegrepen",
+      ],
+    },
+  ];
+
   return (
     <div className="flex min-h-svh flex-col">
       <script
@@ -115,9 +123,9 @@ export default function PricingPage() {
               Eerlijke prijzen. Op de voorkant.
             </h1>
             <p className="mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground">
-              Twee manieren om Bloqk te gebruiken. Allebei zonder commissie,
-              zonder verborgen tiers en zonder kleine lettertjes. Je weet
-              precies waar je voor betaalt.
+              Wij bouwen je salonwebsite vanaf {formatEuro(pricing.websiteBase)}{" "}
+              en je draait op een vast abonnement. Zonder commissie op je
+              boekingen, zonder verborgen tiers en zonder kleine lettertjes.
             </p>
 
             <div className="mt-12 grid gap-6 md:grid-cols-2">
@@ -160,26 +168,26 @@ export default function PricingPage() {
 
             <p className="mt-8 max-w-xl text-sm leading-relaxed text-muted-foreground">
               Alle bedragen zijn exclusief btw. Geen setup-kosten, geen
-              transactiekosten.
+              transactiekosten en 0% commissie op boekingen.
             </p>
           </div>
         </section>
 
-        {/* Website note */}
+        {/* Maatwerk note */}
         <section className="border-b border-border">
           <div className="mx-auto max-w-5xl px-6 py-16">
             <div className="rounded-3xl border border-border bg-secondary/40 px-6 py-8 sm:px-10 sm:py-10">
               <h2 className="text-xl font-bold tracking-tight">
-                We bouwen ook je website.
+                Iets bijzonders nodig? Maatwerk.
               </h2>
               <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-muted-foreground">
-                Nog geen fatsoenlijke website voor je salon? Wij maken er een
-                die past bij Bloqk, met je domein, je e-mail en online boeken
-                erin. Vraag ernaar.
+                Heb je specifieke wensen die buiten onze standaard salonwebsite
+                vallen? Kies in de aanvraag voor maatwerk, dan maken we samen
+                een voorstel dat past, zonder verrassingen achteraf.
               </p>
               <div className="mt-6">
                 <Button asChild variant="outline" size="sm">
-                  <a href="mailto:support@bloqk.nl">Vraag ernaar</a>
+                  <Link href="/start">Start je aanvraag</Link>
                 </Button>
               </div>
             </div>

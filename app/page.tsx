@@ -6,6 +6,8 @@ import { SiteFooter } from "@/components/marketing/site-footer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { siteConfig } from "@/lib/site";
+import { getPricingConfig } from "@/lib/pricing-server";
+import { formatEuro, splitWebsiteMonthly } from "@/lib/pricing";
 
 export const metadata: Metadata = {
     // Bypass the "%s | Bloqk" template for the home page.
@@ -21,50 +23,10 @@ export const metadata: Metadata = {
     },
 };
 
-const jsonLd = {
-    "@context": "https://schema.org",
-    "@graph": [
-        {
-            "@type": "Organization",
-            "@id": `${siteConfig.url}/#organization`,
-            name: "Bloqk",
-            url: siteConfig.url,
-            description: siteConfig.description,
-            areaServed: { "@type": "Country", name: "Netherlands" },
-            knowsLanguage: "nl",
-        },
-        {
-            "@type": "SoftwareApplication",
-            name: "Bloqk",
-            applicationCategory: "BusinessApplication",
-            operatingSystem: "Web",
-            description: siteConfig.description,
-            url: siteConfig.url,
-            inLanguage: "nl",
-            offers: [
-                {
-                    "@type": "Offer",
-                    name: "Abonnement",
-                    price: "29",
-                    priceCurrency: "EUR",
-                    description: "Vast bedrag per maand, maandelijks opzegbaar.",
-                },
-                {
-                    "@type": "Offer",
-                    name: "Eenmalig",
-                    price: "299",
-                    priceCurrency: "EUR",
-                    description: "Eenmalige aankoop plus €9/maand hosting.",
-                },
-            ],
-        },
-    ],
-};
-
 const reasons = [
     {
-        title: "Geen commissie",
-        body: "Fresha pakt een deel van elke betaling. Wij niet. Wat je klant betaalt, is van jou. Je betaalt ons een vast bedrag, meer niet.",
+        title: "0% commissie op boekingen",
+        body: "Fresha pakt een deel van elke betaling. Wij niet. Wat je klant betaalt, is van jou,  elke euro. Je betaalt ons een vast bedrag, meer niet.",
     },
     {
         title: "In Europa gehost",
@@ -81,32 +43,97 @@ const reasons = [
 ];
 
 const stack = [
+    { flag: "🇩🇪", name: "Hetzner", role: "servers & database" },
     { flag: "🇳🇱", name: "Mollie", role: "betalingen" },
-    { flag: "🇩🇪", name: "Hetzner", role: "hosting & database" },
-    { flag: "🇫🇷", name: "Brevo", role: "e-mail" },
-    { flag: "🇳🇱", name: "Cloud86", role: "kapper-websites & domeinen" },
+    { flag: "🇫🇷", name: "Scaleway", role: "e-mail" },
+    { flag: "🇺🇸", name: "Cloudflare", role: "DNS,  eerlijk: Amerikaans" },
 ];
 
-const abonnementIncludes = [
-    "Alle functies, geen uitzonderingen",
-    "Geen commissie op betalingen",
-    "EU-hosting & dagelijkse back-ups",
-    "Updates en support inbegrepen",
-    "Maandelijks opzegbaar",
-];
-
-const eenmaligIncludes = [
-    "Je koopt de software één keer",
-    "€9/maand voor hosting & onderhoud",
-    "Geen commissie op betalingen",
-    "Je data is en blijft van jou",
-    "Updates inbegrepen",
+const steps = [
+    {
+        number: "1",
+        title: "Vertel over je salon",
+        body: "Een paar minuten invullen: je naam, je stijl, je diensten en openingstijden. Of je overlegt liever even,  kan ook.",
+    },
+    {
+        number: "2",
+        title: "Wij bouwen je site",
+        body: "Binnen 48 uur staat je preview klaar. Niet goed? Dan passen we aan tot het wél klopt. Jij keurt goed.",
+    },
+    {
+        number: "3",
+        title: "Live, met boekingen",
+        body: "Je klanten boeken online, jij houdt overzicht in je dashboard. En van elke boeking is elke euro voor jou.",
+    },
 ];
 
 const eyebrow =
     "text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground";
 
-export default function HomePage() {
+export default async function HomePage() {
+    // Dezelfde prijzen als de checkout, dus nooit verouderde bedragen
+    const pricing = await getPricingConfig();
+    const monthYear1 = splitWebsiteMonthly(pricing) + pricing.subMonthly;
+    const yearOneDeal = pricing.websiteUpfront + pricing.subYearly;
+
+    const jsonLd = {
+        "@context": "https://schema.org",
+        "@graph": [
+            {
+                "@type": "Organization",
+                "@id": `${siteConfig.url}/#organization`,
+                name: "Bloqk",
+                url: siteConfig.url,
+                description: siteConfig.description,
+                areaServed: { "@type": "Country", name: "Netherlands" },
+                knowsLanguage: "nl",
+            },
+            {
+                "@type": "SoftwareApplication",
+                name: "Bloqk",
+                applicationCategory: "BusinessApplication",
+                operatingSystem: "Web",
+                description: siteConfig.description,
+                url: siteConfig.url,
+                inLanguage: "nl",
+                offers: [
+                    {
+                        "@type": "Offer",
+                        name: "Maandelijks",
+                        price: (monthYear1 / 100).toFixed(2),
+                        priceCurrency: "EUR",
+                        description:
+                            "Website gespreid over 12 maanden plus abonnement; daarna alleen het abonnement per maand.",
+                    },
+                    {
+                        "@type": "Offer",
+                        name: "Jaarlijks",
+                        price: (yearOneDeal / 100).toFixed(2),
+                        priceCurrency: "EUR",
+                        description:
+                            "Website in één keer plus jaarabonnement met 2 maanden gratis.",
+                    },
+                ],
+            },
+        ],
+    };
+
+    const maandelijksIncludes = [
+        "Complete salonwebsite, door ons gebouwd",
+        "Boekingen, klanten en agenda",
+        "0% commissie op boekingen",
+        `Na jaar 1 nog ${formatEuro(pricing.subMonthly)} per maand`,
+        "EU-hosting & dagelijkse back-ups",
+    ];
+
+    const jaarlijksIncludes = [
+        `Website in één keer: ${formatEuro(pricing.websiteUpfront)}`,
+        `Abonnement ${formatEuro(pricing.subYearly)}/jaar,  2 maanden gratis`,
+        "0% commissie op boekingen",
+        "Je data is en blijft van jou",
+        "Updates en support inbegrepen",
+    ];
+
     return (
         <div className="flex min-h-svh flex-col">
             <script
@@ -135,32 +162,63 @@ export default function HomePage() {
                         <div className="flex-1 text-center lg:text-left">
                             <p className={eyebrow}>Voor kappers, barbiers en stylisten</p>
                             <h1 className="mt-5 text-4xl font-bold leading-[1.05] tracking-tight text-foreground sm:text-6xl">
-                                Boekingssoftware zonder verrassingen.
+                                Je salon online, zonder verrassingen.
                             </h1>
                             <p className="mt-6 max-w-xl mx-auto lg:mx-0 text-lg leading-relaxed text-muted-foreground">
-                                Bloqk regelt je afspraken, je klanten en je agenda. Geen
-                                commissie op je betalingen, geen kleine lettertjes. Gewoon
-                                software die werkt.
+                                Wij bouwen je website, je klanten boeken online en jij
+                                houdt overzicht. 0% commissie op boekingen,  elke euro
+                                die je klanten betalen is voor jou.
                             </p>
                             <div className="mt-9 flex flex-wrap items-center justify-center lg:justify-start gap-3">
                                 <Button className="bg-blue-500 hover:bg-blue-600" asChild size="lg">
-                                    <Link href="/start">Start je gratis proefperiode</Link>
+                                    <Link href="/start">Start je aanvraag</Link>
                                 </Button>
                                 <Button asChild size="lg" variant="outline">
                                     <Link href="/pricing">Bekijk prijzen</Link>
                                 </Button>
                             </div>
+                            <p className="mt-5 text-sm text-muted-foreground">
+                                Website vanaf {formatEuro(pricing.websiteBase)} · abonnement
+                                vanaf {formatEuro(pricing.subMonthly)}/mnd · geen commissie
+                            </p>
                         </div>
-                        
+
                         {/* Product Visual Mockup */}
                         <div className="flex-1 w-full max-w-md lg:max-w-none relative">
                             <div className="aspect-9/16 lg:aspect-square overflow-hidden rounded-2xl border border-border bg-muted/50 shadow-2xl flex items-center justify-center">
                                 {/* Replace this div with your actual <Image /> tag of the mobile app */}
                                 <div className="text-center p-6">
-                                    <p className="text-muted-foreground font-medium">✨ [Screenshot Mobile Dashboard] ✨</p>
-                                    <p className="text-xs text-muted-foreground mt-2">Plaats hier een afbeelding van de app</p>
+                                    <p className="text-4xl font-light tracking-tight select-none">
+                                        bloqk<span className="text-primary">.</span>
+                                    </p>
+                                    <p className="text-xs text-muted-foreground mt-3">
+                                        [Screenshot mobile dashboard]
+                                    </p>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </section>
+
+                {/* Zo werkt het */}
+                <section className="border-b border-border bg-muted/30">
+                    <div className="mx-auto max-w-5xl px-6 py-24">
+                        <p className={eyebrow}>Zo werkt het</p>
+                        <h2 className="mt-4 max-w-2xl text-2xl font-bold tracking-tight sm:text-3xl">
+                            Van aanvraag tot live, zonder gedoe.
+                        </h2>
+                        <div className="mt-14 grid gap-10 sm:grid-cols-3">
+                            {steps.map((step) => (
+                                <div key={step.number}>
+                                    <span className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
+                                        {step.number}
+                                    </span>
+                                    <h3 className="mt-4 text-base font-bold">{step.title}</h3>
+                                    <p className="mt-2 text-[15px] leading-relaxed text-muted-foreground">
+                                        {step.body}
+                                    </p>
+                                </div>
+                            ))}
                         </div>
                     </div>
                 </section>
@@ -172,6 +230,10 @@ export default function HomePage() {
                         <h2 className="mt-4 max-w-2xl text-2xl font-bold tracking-tight sm:text-3xl">
                             Eerlijk, van begin tot eind.
                         </h2>
+                        <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-muted-foreground">
+                            We noemen het pragmatisch idealistisch: zo ethisch mogelijk,
+                            terwijl de software gewoon goed werkt.
+                        </p>
                         <div className="mt-14 grid gap-x-12 gap-y-12 sm:grid-cols-2">
                             {reasons.map((reason) => (
                                 <div key={reason.title}>
@@ -185,21 +247,6 @@ export default function HomePage() {
                     </div>
                 </section>
 
-                {/* Social Proof / Testimonial */}
-                <section className="bg-muted/30 border-b border-border">
-                    <div className="mx-auto max-w-5xl px-6 py-24 text-center">
-                        <div className="inline-flex items-center gap-1 text-amber-500 mb-6">
-                            {"★★★★★".split("").map((star, i) => (
-                                <span key={i}>{star}</span>
-                            ))}
-                        </div>
-                        <blockquote className="text-xl sm:text-2xl font-medium leading-relaxed text-foreground max-w-3xl mx-auto">
-                            &quot;Sinds we zijn overgestapt op Bloqk betalen we honderden euro&apos;s per maand minder aan commissies. Het systeem is supersnel op mijn telefoon.&quot;
-                        </blockquote>
-                        <p className="mt-6 font-semibold text-sm">— Naam Kapper, Eigenaar van Salon X</p>
-                    </div>
-                </section>
-
                 {/* Pricing */}
                 <section className="border-b border-border bg-background">
                     <div className="mx-auto max-w-5xl px-6 py-24">
@@ -208,26 +255,26 @@ export default function HomePage() {
                             Je weet precies waar je voor betaalt.
                         </h2>
                         <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-muted-foreground">
-                            Twee manieren. Kies wat bij je past. Geen verborgen tiers,
-                            geen commissie.
+                            Website plus abonnement, betalen zoals het jou past. Geen
+                            verborgen tiers, geen commissie.
                         </p>
 
                         <div className="mt-12 grid gap-6 md:grid-cols-2">
                             <Card className="shadow-sm">
                                 <CardHeader>
-                                    <p className="text-sm font-semibold">Abonnement</p>
+                                    <p className="text-sm font-semibold">Maandelijks</p>
                                     <p className="mt-3 flex items-baseline gap-1.5">
                                         <span className="text-4xl font-bold tracking-tight">
-                                            €29
+                                            {formatEuro(monthYear1)}
                                         </span>
                                         <span className="text-sm text-muted-foreground">
-                                            per maand
+                                            per maand in jaar 1
                                         </span>
                                     </p>
                                 </CardHeader>
                                 <CardContent className="flex-1">
                                     <ul className="flex flex-col gap-2.5 text-sm">
-                                        {abonnementIncludes.map((item) => (
+                                        {maandelijksIncludes.map((item) => (
                                             <li key={item} className="flex gap-2.5">
                                                 <span
                                                     aria-hidden
@@ -244,26 +291,26 @@ export default function HomePage() {
                                 </CardContent>
                                 <CardFooter>
                                     <Button asChild className="w-full bg-blue-500 hover:bg-blue-600">
-                                        <Link href="/start">Kies Abonnement</Link>
+                                        <Link href="/start">Aan de slag</Link>
                                     </Button>
                                 </CardFooter>
                             </Card>
 
                             <Card className="shadow-sm">
                                 <CardHeader>
-                                    <p className="text-sm font-semibold">Eenmalig</p>
+                                    <p className="text-sm font-semibold">Jaarlijks — beste deal</p>
                                     <p className="mt-3 flex items-baseline gap-1.5">
                                         <span className="text-4xl font-bold tracking-tight">
-                                            €299
+                                            {formatEuro(yearOneDeal)}
                                         </span>
                                         <span className="text-sm text-muted-foreground">
-                                            + €9/maand hosting
+                                            eerste jaar, alles erin
                                         </span>
                                     </p>
                                 </CardHeader>
                                 <CardContent className="flex-1">
                                     <ul className="flex flex-col gap-2.5 text-sm">
-                                        {eenmaligIncludes.map((item) => (
+                                        {jaarlijksIncludes.map((item) => (
                                             <li key={item} className="flex gap-2.5">
                                                 <span
                                                     aria-hidden
@@ -300,7 +347,8 @@ export default function HomePage() {
                             Je weet precies waar je data staat.
                         </h2>
                         <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-muted-foreground">
-                            Geen verborgen Amerikaanse diensten. Dit is de solide basis waar Bloqk op draait.
+                            Europese diensten waar het kan, en eerlijkheid waar het (nog)
+                            niet kan. Dit is de basis waar Bloqk op draait.
                         </p>
 
                         <div className="mt-12 grid gap-px overflow-hidden rounded-3xl border border-border bg-border sm:grid-cols-2">
@@ -321,12 +369,14 @@ export default function HomePage() {
                         </div>
 
                         <p className="mt-6 max-w-xl text-sm leading-relaxed text-muted-foreground">
-                            Bloqk is gebouwd op de meest betrouwbare en veilige infrastructuur van Europa. Jouw data is van jou, is beveiligd volgens de hoogste standaarden, en wordt nooit gedeeld met derden.{" "}
+                            Je data staat in Duitsland, je betalingen lopen via Nederland
+                            en je e-mail via Frankrijk. Jouw data is van jou en wordt
+                            nooit gedeeld met derden.{" "}
                             <Link
                                 href="/stack"
                                 className="text-foreground underline underline-offset-4 hover:text-primary font-medium"
                             >
-                                Lees waarom we deze keuzes maken.
+                                Bekijk onze volledige stack.
                             </Link>
                         </p>
                     </div>
@@ -339,12 +389,12 @@ export default function HomePage() {
                             Klaar om te beginnen?
                         </h2>
                         <p className="mx-auto mt-4 max-w-md text-[15px] leading-relaxed text-muted-foreground">
-                            Geen demo calls, geen sales druk. Vraag direct toegang aan en we
-                            regelen het binnen 1 werkdag voor je.
+                            Geen demo calls, geen sales druk. Doe je aanvraag in een paar
+                            minuten en binnen 48 uur staat je preview klaar.
                         </p>
                         <div className="mt-8">
                             <Button className="bg-blue-500 hover:bg-blue-600" asChild size="lg">
-                                <Link href="/start">Vraag toegang aan</Link>
+                                <Link href="/start">Start je aanvraag</Link>
                             </Button>
                         </div>
                     </div>

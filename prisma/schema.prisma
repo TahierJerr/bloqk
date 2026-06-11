@@ -126,6 +126,25 @@ model Salon {
   services     Service[]
   appointments Appointment[]
   settings     SalonSettings?
+  staffInvites StaffInvite[]
+}
+
+// ─── STAFF INVITES (uitnodigingslinks met token) ─────────────────────────────
+
+model StaffInvite {
+  id         String    @id @default(uuid())
+  token      String    @unique
+  email      String
+  role       Role      @default(STAFF)
+  expiresAt  DateTime
+  acceptedAt DateTime?
+
+  salonId String
+  salon   Salon  @relation(fields: [salonId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([salonId])
 }
 
 // ─── SALON SETTINGS (branding + openingstijden uit de intake-wizard) ─────────
@@ -295,6 +314,10 @@ model Order {
   billing           String?
   // Laatst bekende Mollie-betaalstatus (open/pending/authorized/paid/canceled/expired/failed)
   lastPaymentStatus String?
+  // Mollie-klant waar de mandate en abonnementen aan hangen
+  mollieCustomerId      String?
+  // Abonnementen die na de eerste betaling zijn gestart
+  mollieSubscriptionIds String[] @default([])
 
   userId    String
   user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)

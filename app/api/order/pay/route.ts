@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { SequenceType } from "@mollie/api-client";
 import prismadb from "@/lib/prismadb";
 import { getSessionAndLatestOrder } from "@/lib/order";
 import { getMollieClient } from "@/lib/mollie";
@@ -12,7 +13,7 @@ export async function POST(req: NextRequest) {
             return Response.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const { order } = ctx;
+        const { session, order } = ctx;
         if (!order || order.status !== "APPROVED") {
             return Response.json(
                 { error: "Er staat geen betaling open voor je aanvraag" },
@@ -30,16 +31,31 @@ export async function POST(req: NextRequest) {
             );
         }
 
+        const mollie = getMollieClient();
+
+        // De abonnementen hangen aan een Mollie-klant; de eerste betaling
+        // (sequenceType "first") levert de incassomachtiging op
+        let customerId = order.mollieCustomerId;
+        if (!customerId) {
+            const customer = await mollie.customers.create({
+                name: session.user.name,
+                email: session.user.email,
+            });
+            customerId = customer.id;
+        }
+
         const origin = req.nextUrl.origin;
         // Mollie accepteert geen webhook op localhost; lokaal vangt de
         // dashboard-laag de status op door de betaling zelf na te vragen
         const isLocal = /localhost|127\.0\.0\.1/.test(origin);
 
-        const payment = await getMollieClient().payments.create({
+        const payment = await mollie.payments.create({
             amount: { currency: "EUR", value: (plan.dueNow / 100).toFixed(2) },
             description: `Bloqk – ${order.salonName} (${
-                order.billing === "yearly" ? "jaardeal" : "termijn 1 van 12"
+                order.billing === "yearly" ? "website, jaardeal" : "termijn 1 van 12"
             })`,
+            customerId,
+            sequenceType: SequenceType.first,
             redirectUrl: `${origin}/dashboard`,
             ...(isLocal ? {} : { webhookUrl: `${origin}/api/order/webhook` }),
             metadata: { orderId: order.id },
@@ -48,6 +64,7 @@ export async function POST(req: NextRequest) {
         await prismadb.order.update({
             where: { id: order.id },
             data: {
+                mollieCustomerId: customerId,
                 molliePaymentId: payment.id,
                 lastPaymentStatus: payment.status,
             },

@@ -14,10 +14,11 @@ export function ProgressBlocks({ current, total }: ProgressBlocksProps) {
         <div className="flex flex-col items-center gap-3 text-center">
             <Logo size="lg"/>
             <h1 className="max-w-md text-2xl font-semibold tracking-tight sm:text-3xl">
-                Zet je salon online in een paar minuten
+                Zet je salon online
             </h1>
             <p className="max-w-md text-sm text-muted-foreground sm:text-base">
-                Vertel ons iets over je salon, dan regelen wij de rest.
+                Aanvragen duurt een paar minuten. Daarna bouwen wij je site en
+                sturen we je binnen 48 uur een preview.
             </p>
         </div>
         <div className="flex flex-col gap-2">

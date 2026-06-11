@@ -408,6 +408,17 @@ export function OrderProgress({ order }: { order: OrderProgressInfo }) {
                                                                         {formatEuro(order.payment.dueNow)}
                                                                     </span>
                                                                 </div>
+                                                                {order.payment.recurring.map((line) => (
+                                                                    <div
+                                                                        key={line.label}
+                                                                        className="flex items-center justify-between gap-3 px-4 py-2.5 text-xs text-muted-foreground"
+                                                                    >
+                                                                        <span>{line.label}</span>
+                                                                        <span className="tabular-nums">
+                                                                            {formatEuro(line.amount)}
+                                                                        </span>
+                                                                    </div>
+                                                                ))}
                                                             </div>
                                                             <p className="text-xs leading-relaxed text-muted-foreground">
                                                                 {order.payment.afterNote}

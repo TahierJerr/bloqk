@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import prismadb from "@/lib/prismadb";
 import { getMollieClient } from "@/lib/mollie";
+import { handleFirstPaymentPaid } from "@/lib/subscriptions";
 
 // Mollie post een x-www-form-urlencoded body met alleen het betalings-id;
 // de status halen we vervolgens zelf bij Mollie op, dus de body is niet
@@ -10,7 +11,7 @@ import { getMollieClient } from "@/lib/mollie";
 //   open       — checkout aangemaakt, nog geen betaalpoging afgerond
 //   pending    — betaling gestart, wacht op bevestiging (bijv. overboeking)
 //   authorized — bedrag gereserveerd, nog niet geïncasseerd
-//   paid       — betaald: order door naar PAID
+//   paid       — betaald: order naar PAID + abonnementen starten
 //   canceled   — klant heeft afgebroken: betaling loskoppelen voor retry
 //   expired    — checkout verlopen: idem
 //   failed     — betaling mislukt: idem
@@ -26,16 +27,20 @@ export async function POST(req: NextRequest) {
         const orderId = (payment.metadata as { orderId?: string } | null)?.orderId;
         if (!orderId) return new Response("OK");
 
+        // Incasso's van lopende abonnementen: alleen de status bijhouden,
+        // de orderstatus verandert er niet door
+        if (payment.subscriptionId) {
+            if (payment.status === "failed" || payment.status === "expired") {
+                console.error(
+                    `Abonnementsincasso ${payment.id} (${payment.status}) voor order ${orderId}`
+                );
+            }
+            return new Response("OK");
+        }
+
         switch (payment.status) {
             case "paid":
-                await prismadb.order.updateMany({
-                    where: {
-                        id: orderId,
-                        molliePaymentId: paymentId,
-                        status: "APPROVED",
-                    },
-                    data: { status: "PAID", lastPaymentStatus: "paid" },
-                });
+                await handleFirstPaymentPaid(orderId, paymentId);
                 break;
 
             case "canceled":

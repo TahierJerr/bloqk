@@ -14,6 +14,12 @@ export const auth = betterAuth({
     emailAndPassword: {
         enabled: true, // You can leave this enabled if you want to support both, or set to false to enforce purely passwordless
     },
+    session: {
+        // Automatisch uitloggen na 3 uur inactiviteit: de sessie verloopt
+        // na 3 uur maar wordt bij activiteit (elke 15 min) verlengd
+        expiresIn: 60 * 60 * 3,
+        updateAge: 60 * 15,
+    },
     user: {
         additionalFields: {
             phone: {

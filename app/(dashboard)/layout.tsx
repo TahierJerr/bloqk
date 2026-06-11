@@ -6,6 +6,7 @@ import { getMollieClient } from "@/lib/mollie";
 import { computePaymentPlan } from "@/lib/pricing";
 import { getPricingConfig } from "@/lib/pricing-server";
 import prismadb from "@/lib/prismadb";
+import { handleFirstPaymentPaid } from "@/lib/subscriptions";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -57,9 +58,11 @@ export default async function DashboardLayout({
         try {
             const payment = await getMollieClient().payments.get(order.molliePaymentId);
             if (payment.status === "paid") {
-                order = await prismadb.order.update({
+                // Zet de order op PAID en start de abonnementen (zelfde pad
+                // als de webhook)
+                await handleFirstPaymentPaid(order.id, order.molliePaymentId);
+                order = await prismadb.order.findUniqueOrThrow({
                     where: { id: order.id },
-                    data: { status: "PAID", lastPaymentStatus: "paid" },
                 });
             } else if (
                 payment.status === "canceled" ||

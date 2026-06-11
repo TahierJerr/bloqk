@@ -206,7 +206,7 @@ export function PricingForm({ pricing }: { pricing: Pricing }) {
                     {yearlyPlan && preview ? (
                         <>
                             <p className="mt-2 text-2xl font-semibold tracking-tight">
-                                {formatEuro(yearlyPlan.dueNow)}
+                                {formatEuro(preview.websiteUpfront + preview.subYearly)}
                                 <span className="text-sm font-normal text-muted-foreground">
                                     {" "}eerste jaar
                                 </span>
