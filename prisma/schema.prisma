@@ -291,6 +291,11 @@ model Order {
   contactMethod     String?
   intakeCompletedAt DateTime?
 
+  // Abonnementskeuze: monthly | yearly (verplicht voor dashboard + boekingen)
+  billing           String?
+  // Laatst bekende Mollie-betaalstatus (open/pending/authorized/paid/canceled/expired/failed)
+  lastPaymentStatus String?
+
   userId    String
   user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -307,4 +312,26 @@ enum OrderStatus {
   PAID
   ACTIVE
   CANCELLED
+}
+
+// ─── PRICING (bewerkbaar via /admin/pricing, bedragen in centen) ─────────────
+
+model PricingConfig {
+  id String @id @default(uuid())
+
+  // "Vanaf"-prijs voor het bouwen van de website (marketing)
+  websiteBase       Int @default(14900)
+  // Website gespreid betaald over 12 maanden (totaal)
+  websiteSplitTotal Int @default(19900)
+  // Website in één keer betaald (jaardeal)
+  websiteUpfront    Int @default(17400)
+  // Abonnement per maand
+  subMonthly        Int @default(2900)
+  // Abonnement per jaar (2 maanden gratis t.o.v. 12 × maandprijs)
+  subYearly         Int @default(31300)
+  // Informatieve uitsplitsing van het maandbedrag
+  hostingShare      Int @default(900)
+  softwareShare     Int @default(2000)
+
+  updatedAt DateTime @updatedAt
 }

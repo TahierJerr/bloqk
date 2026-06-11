@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        const { salonName, salonType, hasDomain, customDomain, address, package: pkg } = parsed.data;
+        const { salonName, salonType, hasDomain, customDomain, address, package: pkg, billing } = parsed.data;
 
         // Alleen bij een eigen domein krijgt de salon een domein en slug;
         // anders blijven beide leeg tot er een domein wordt gekozen
@@ -100,6 +100,7 @@ export async function POST(req: NextRequest) {
                     salonType,
                     address,
                     package: pkg,
+                    billing,
                     userId,
                 },
             });

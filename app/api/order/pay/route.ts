@@ -2,7 +2,8 @@ import { NextRequest } from "next/server";
 import prismadb from "@/lib/prismadb";
 import { getSessionAndLatestOrder } from "@/lib/order";
 import { getMollieClient } from "@/lib/mollie";
-import { PACKAGE_PRICES, type Package } from "@/lib/order-schema";
+import { getPricingConfig } from "@/lib/pricing-server";
+import { computePaymentPlan } from "@/lib/pricing";
 
 export async function POST(req: NextRequest) {
     try {
@@ -19,10 +20,12 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        const price = PACKAGE_PRICES[order.package as Package];
-        if (!price) {
+        // Bedrag altijd server-side berekenen uit de actuele prijsconfiguratie
+        const pricing = await getPricingConfig();
+        const plan = computePaymentPlan(order, pricing);
+        if (!plan) {
             return Response.json(
-                { error: "We nemen contact met je op om de betaling af te ronden" },
+                { error: "We sturen je een voorstel op maat voor de betaling" },
                 { status: 400 }
             );
         }
@@ -33,8 +36,10 @@ export async function POST(req: NextRequest) {
         const isLocal = /localhost|127\.0\.0\.1/.test(origin);
 
         const payment = await getMollieClient().payments.create({
-            amount: { currency: "EUR", value: price },
-            description: `Bloqk – ${order.salonName} (${order.package})`,
+            amount: { currency: "EUR", value: (plan.dueNow / 100).toFixed(2) },
+            description: `Bloqk – ${order.salonName} (${
+                order.billing === "yearly" ? "jaardeal" : "termijn 1 van 12"
+            })`,
             redirectUrl: `${origin}/dashboard`,
             ...(isLocal ? {} : { webhookUrl: `${origin}/api/order/webhook` }),
             metadata: { orderId: order.id },
@@ -42,7 +47,10 @@ export async function POST(req: NextRequest) {
 
         await prismadb.order.update({
             where: { id: order.id },
-            data: { molliePaymentId: payment.id },
+            data: {
+                molliePaymentId: payment.id,
+                lastPaymentStatus: payment.status,
+            },
         });
 
         return Response.json({ checkoutUrl: payment.getCheckoutUrl() });

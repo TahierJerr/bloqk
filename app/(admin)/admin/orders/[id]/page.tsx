@@ -24,7 +24,12 @@ import {
     DAY_NAMES,
     type ContactMethod,
 } from "@/lib/intake-schema";
-import { FEEDBACK_REASON_LABELS, type FeedbackReason } from "@/lib/order-schema";
+import {
+    BILLING_LABELS,
+    FEEDBACK_REASON_LABELS,
+    type Billing,
+    type FeedbackReason,
+} from "@/lib/order-schema";
 
 const dateFormatter = new Intl.DateTimeFormat("nl-NL", {
     weekday: "long",
@@ -212,6 +217,17 @@ export default async function AdminOrderPage({
                             <dt className="text-muted-foreground">Aanvraag</dt>
                             <dd className="font-medium">
                                 {dateFormatter.format(order.createdAt)}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt className="text-muted-foreground">Facturering</dt>
+                            <dd className="font-medium">
+                                {order.billing
+                                    ? BILLING_LABELS[order.billing as Billing] ?? order.billing
+                                    : "—"}
+                                {order.lastPaymentStatus
+                                    ? ` · betaling: ${order.lastPaymentStatus}`
+                                    : ""}
                             </dd>
                         </div>
                         {salon?.domain ? (

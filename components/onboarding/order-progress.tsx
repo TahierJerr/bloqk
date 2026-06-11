@@ -26,7 +26,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/logo";
 import { ChoiceBlock } from "@/components/order-form/choice-block";
-import { PACKAGE_PRICES, type Package } from "@/lib/order-schema";
+import { formatEuro, type PaymentPlan } from "@/lib/pricing";
 import {
     CONTACT_METHODS,
     CONTACT_METHOD_LABELS,
@@ -43,6 +43,17 @@ export type OrderProgressInfo = {
     salonName: string;
     intakeChoice: string | null;
     contactMethod: string | null;
+    billing: string | null;
+    lastPaymentStatus: string | null;
+    // Server-side berekend uit de actuele prijsconfiguratie
+    payment: PaymentPlan | null;
+};
+
+// Meldingen voor Mollie-statussen waarbij de betaling niet doorging
+const PAYMENT_FAILURE_NOTES: Record<string, string> = {
+    failed: "Je vorige betaling is mislukt. Probeer het gerust opnieuw.",
+    canceled: "Je vorige betaling is geannuleerd. Probeer het gerust opnieuw.",
+    expired: "Je vorige betaalsessie is verlopen. Probeer het gerust opnieuw.",
 };
 
 const CONTACT_METHOD_ICONS: Record<ContactMethod, typeof Mail> = {
@@ -109,7 +120,13 @@ export function OrderProgress({ order }: { order: OrderProgressInfo }) {
     }
 
     const activeStep = ACTIVE_STEP[order.status as keyof typeof ACTIVE_STEP] ?? 1;
-    const price = PACKAGE_PRICES[order.package as Package];
+    // Betaling wacht op externe bevestiging (bijv. overboeking)
+    const paymentInProgress =
+        order.lastPaymentStatus === "pending" ||
+        order.lastPaymentStatus === "authorized";
+    const paymentFailureNote = order.lastPaymentStatus
+        ? PAYMENT_FAILURE_NOTES[order.lastPaymentStatus] ?? null
+        : null;
 
     async function requestContact() {
         if (!contactMethod) {
@@ -368,27 +385,73 @@ export function OrderProgress({ order }: { order: OrderProgressInfo }) {
                                                         Goedgekeurd! Rond de betaling af, daarna
                                                         zetten we {order.salonName} live.
                                                     </p>
-                                                    {price ? (
-                                                        <div>
-                                                            <Button
-                                                                onClick={pay}
-                                                                disabled={busy}
-                                                                className="cursor-pointer"
-                                                            >
-                                                                {busy ? (
-                                                                    <Loader2 className="mr-2 size-4 animate-spin" />
-                                                                ) : null}
-                                                                Betalen (€{price.replace(".", ",")})
-                                                            </Button>
-                                                            <p className="mt-2 text-xs text-muted-foreground">
-                                                                Je wordt veilig doorgestuurd naar onze
-                                                                betaalpagina.
+                                                    {order.payment ? (
+                                                        <>
+                                                            {/* Opbouw van het bedrag */}
+                                                            <div className="divide-y overflow-hidden rounded-xl border bg-background">
+                                                                {order.payment.lines.map((line) => (
+                                                                    <div
+                                                                        key={line.label}
+                                                                        className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm"
+                                                                    >
+                                                                        <span className="text-muted-foreground">
+                                                                            {line.label}
+                                                                        </span>
+                                                                        <span className="font-medium tabular-nums">
+                                                                            {formatEuro(line.amount)}
+                                                                        </span>
+                                                                    </div>
+                                                                ))}
+                                                                <div className="flex items-center justify-between gap-3 bg-muted/50 px-4 py-2.5 text-sm font-semibold">
+                                                                    <span>Nu te betalen</span>
+                                                                    <span className="tabular-nums">
+                                                                        {formatEuro(order.payment.dueNow)}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                            <p className="text-xs leading-relaxed text-muted-foreground">
+                                                                {order.payment.afterNote}
                                                             </p>
-                                                        </div>
+                                                            <p className="rounded-xl bg-primary/5 px-4 py-3 text-sm font-medium text-primary">
+                                                                0% commissie op boekingen — elke euro
+                                                                die je klanten betalen is voor jou.
+                                                            </p>
+                                                            {paymentFailureNote && (
+                                                                <p className="text-sm font-medium text-destructive">
+                                                                    {paymentFailureNote}
+                                                                </p>
+                                                            )}
+                                                            {paymentInProgress ? (
+                                                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                                                    <Loader2 className="size-4 animate-spin" />
+                                                                    We wachten op de bevestiging van je
+                                                                    betaling. Dit kan even duren, je
+                                                                    hoeft niets te doen.
+                                                                </div>
+                                                            ) : (
+                                                                <div>
+                                                                    <Button
+                                                                        onClick={pay}
+                                                                        disabled={busy}
+                                                                        className="cursor-pointer"
+                                                                    >
+                                                                        {busy ? (
+                                                                            <Loader2 className="mr-2 size-4 animate-spin" />
+                                                                        ) : null}
+                                                                        Betalen ({formatEuro(order.payment.dueNow)})
+                                                                    </Button>
+                                                                    <p className="mt-2 text-xs text-muted-foreground">
+                                                                        Je wordt veilig doorgestuurd naar
+                                                                        onze betaalpagina.
+                                                                    </p>
+                                                                </div>
+                                                            )}
+                                                        </>
                                                     ) : (
                                                         <p className="text-sm leading-relaxed text-muted-foreground">
-                                                            We nemen contact met je op om de betaling
-                                                            af te ronden.
+                                                            Maatwerk heeft geen vaste prijs; we nemen
+                                                            contact met je op om de betaling af te
+                                                            ronden.
                                                         </p>
                                                     )}
                                                 </div>

@@ -30,6 +30,15 @@ export const SUBSCRIPTION_PRICES = {
     yearly: "313.00", // 2 months free vs 29 * 12 = 348
 };
 
+// Abonnement is verplicht (dashboard + boekingen); keuze is maand of jaar
+export const BILLING_OPTIONS = ["monthly", "yearly"] as const;
+export type Billing = (typeof BILLING_OPTIONS)[number];
+
+export const BILLING_LABELS: Record<Billing, string> = {
+    monthly: "Maandelijks (alles gespreid)",
+    yearly: "Jaarlijks (beste deal)",
+};
+
 export const FEEDBACK_REASONS = [
     "changes",
     "not-what-i-want",
@@ -69,6 +78,7 @@ export const orderSchema = z.object({
     customDomain: z.string().optional(),
     address: z.string().min(1, "Kies een adres uit de lijst"),
     package: z.enum(PACKAGES, { message: "Maak een keuze" }),
+    billing: z.enum(BILLING_OPTIONS, { message: "Maak een keuze" }),
 }).superRefine((data, ctx) => {
     // Als ze 'ja' kiezen, moet het domeinveld ingevuld zijn
     if (data.hasDomain === "yes" && (!data.customDomain || data.customDomain.trim().length < 3)) {

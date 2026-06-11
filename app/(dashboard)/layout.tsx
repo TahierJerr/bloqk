@@ -3,6 +3,8 @@ import { OrderProgress } from "@/components/onboarding/order-progress";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { auth } from "@/lib/auth";
 import { getMollieClient } from "@/lib/mollie";
+import { computePaymentPlan } from "@/lib/pricing";
+import { getPricingConfig } from "@/lib/pricing-server";
 import prismadb from "@/lib/prismadb";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
@@ -45,7 +47,8 @@ export default async function DashboardLayout({
     });
 
     // Vangnet voor als de Mollie-webhook ons niet bereikt (bijv. lokaal):
-    // vraag de betaalstatus zelf op zolang er een betaling openstaat
+    // vraag de betaalstatus zelf op zolang er een betaling openstaat, en
+    // reageer op alle Mollie-statussen net als de webhook
     if (
         order?.status === "APPROVED" &&
         order.molliePaymentId &&
@@ -56,7 +59,22 @@ export default async function DashboardLayout({
             if (payment.status === "paid") {
                 order = await prismadb.order.update({
                     where: { id: order.id },
-                    data: { status: "PAID" },
+                    data: { status: "PAID", lastPaymentStatus: "paid" },
+                });
+            } else if (
+                payment.status === "canceled" ||
+                payment.status === "expired" ||
+                payment.status === "failed"
+            ) {
+                // Loskoppelen zodat de klant opnieuw kan afrekenen
+                order = await prismadb.order.update({
+                    where: { id: order.id },
+                    data: { molliePaymentId: null, lastPaymentStatus: payment.status },
+                });
+            } else if (payment.status !== order.lastPaymentStatus) {
+                order = await prismadb.order.update({
+                    where: { id: order.id },
+                    data: { lastPaymentStatus: payment.status },
                 });
             }
         } catch (error) {
@@ -67,6 +85,13 @@ export default async function DashboardLayout({
     // Tot de salon live is (ACTIVE) zien klanten de voortgang in plaats
     // van het dashboard
     if (order && order.status !== "ACTIVE") {
+        // Betaalplan (bedrag + opbouw) server-side berekenen uit de
+        // actuele prijsconfiguratie
+        const payment =
+            order.status === "APPROVED"
+                ? computePaymentPlan(order, await getPricingConfig())
+                : null;
+
         return (
             <OrderProgress
                 order={{
@@ -77,6 +102,9 @@ export default async function DashboardLayout({
                     salonName: order.salonName,
                     intakeChoice: order.intakeChoice,
                     contactMethod: order.contactMethod,
+                    billing: order.billing,
+                    lastPaymentStatus: order.lastPaymentStatus,
+                    payment,
                 }}
             />
         );

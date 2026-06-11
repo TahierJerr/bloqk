@@ -4,7 +4,7 @@ import * as React from "react";
 
 import { NavMain } from "@/components/nav-main";
 import { NavSecondary } from "@/components/nav-secondary";
-import { NavUser } from "@/components/nav-user";
+import { NavUser, type SidebarUser } from "@/components/nav-user";
 import {
   Sidebar,
   SidebarContent,
@@ -25,7 +25,6 @@ import {
 } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { PasskeyRegistrationModal } from "./auth/passkey-registration-modal";
-import type { Staff } from "@/prisma/generated/prisma/client";
 
 const data = {
   navMain: [
@@ -69,7 +68,25 @@ const data = {
   ],
 };
 
-export function AppSidebar({ staff, ...props }: { staff: Staff } & React.ComponentProps<typeof Sidebar>) {
+type NavItem = {
+  title: string;
+  url: string;
+  icon: React.ReactNode;
+};
+
+export function AppSidebar({
+  staff,
+  navMain = data.navMain,
+  navSecondary = data.navSecondary,
+  homeUrl = "/dashboard",
+  ...props
+}: {
+  staff: SidebarUser;
+  // Overschrijfbaar zodat dezelfde sidebar ook het admin-paneel bedient
+  navMain?: NavItem[];
+  navSecondary?: NavItem[];
+  homeUrl?: string;
+} & React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
@@ -79,7 +96,7 @@ export function AppSidebar({ staff, ...props }: { staff: Staff } & React.Compone
               asChild
               className="data-[slot=sidebar-menu-button]:p-1.5!"
             >
-              <a href="/dashboard">
+              <a href={homeUrl}>
                 <Logo size="sm" />
               </a>
             </SidebarMenuButton>
@@ -87,8 +104,8 @@ export function AppSidebar({ staff, ...props }: { staff: Staff } & React.Compone
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
-        <NavSecondary items={data.navSecondary} className="mt-auto" />
+        <NavMain items={navMain} />
+        <NavSecondary items={navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
         <PasskeyRegistrationModal />

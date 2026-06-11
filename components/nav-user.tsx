@@ -21,14 +21,19 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 import { EllipsisVerticalIcon, CircleUserRoundIcon, CreditCardIcon, BellIcon, LogOutIcon } from "lucide-react"
-import type { Staff } from "@/prisma/generated/prisma/client"
 
-
+// Structureel subtype van Staff zodat de sidebar ook buiten een
+// salon-context (bijv. admin) gebruikt kan worden
+export type SidebarUser = {
+  name: string
+  email?: string | null
+  imageUrl?: string | null
+}
 
 export function NavUser({
   staff
 }: {
-  staff: Staff
+  staff: SidebarUser
 }) {
   const { isMobile } = useSidebar()
 

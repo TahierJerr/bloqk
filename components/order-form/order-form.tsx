@@ -9,18 +9,19 @@ import type { LucideIcon } from "lucide-react";
 import {
     ArrowLeft,
     ArrowRight,
+    BadgePercent,
     CalendarClock,
     Flower2,
     Gem,
+    Hammer,
     Hand,
     Loader2,
-    MessageCircle,
     PartyPopper,
     Pencil,
     PenTool,
     Scissors,
-    Server,
     Sparkles,
+    Wand2,
     Globe,
     Link as LinkIcon
 } from "lucide-react";
@@ -41,27 +42,35 @@ import { cn } from "@/lib/utils";
 import {
     orderSchema,
     SALON_TYPES,
+    type Billing,
     type OrderFormValues,
     type Package,
     type SalonType,
+    BILLING_LABELS,
 } from "@/lib/order-schema";
+import {
+    formatEuro,
+    splitWebsiteMonthly,
+    type Pricing,
+} from "@/lib/pricing";
 import { ChoiceBlock } from "@/components/order-form/choice-block";
 import { AddressAutocomplete } from "@/components/order-form/address-autocomplete";
 import { ProgressBlocks } from "@/components/order-form/progress-blocks";
 import { OnboardingSignUpForm } from "../auth/onboarding-sign-up-form";
 import { authClient } from "@/lib/auth-client";
 
-// 6 form steps (indices 0-5); the summary is the last one. The progress bar
+// 7 form steps (indices 0-6); the summary is the last one. The progress bar
 // shows one extra step because the account step (auth) precedes the form.
-const TOTAL_STEPS = 6;
-const SUMMARY_STEP = 5;
+const TOTAL_STEPS = 7;
+const SUMMARY_STEP = 6;
 
 const STEP_META: { title: string; subtitle: string }[] = [
     { title: "Wat voor salon heb je?", subtitle: "Kies wat het beste past." },
     { title: "Hoe heet je salon?", subtitle: "Zo verschijnt je naam straks in Bloqk." },
     { title: "Heb je al een website?", subtitle: "Koppel je eigen domein of claim een nieuwe." },
     { title: "Waar zit je salon?", subtitle: "We zoeken je adres op in de database." },
-    { title: "Welk pakket past bij je?", subtitle: "Je zit nergens aan vast." },
+    { title: "Wie bouwt je website?", subtitle: "Wij bouwen hem voor je, of we maken iets volledig op maat." },
+    { title: "Hoe wil je betalen?", subtitle: "Het abonnement regelt je dashboard en online boekingen." },
     { title: "Klopt alles?", subtitle: "Controleer je gegevens en verstuur je aanvraag." },
 ];
 
@@ -74,27 +83,47 @@ const SALON_TYPE_ICONS: Record<SalonType, LucideIcon> = {
     Massagesalons: Flower2,
 };
 
-const PACKAGE_OPTIONS: {
+function getPackageOptions(pricing: Pricing): {
     value: Package;
     description: string;
     icon: LucideIcon;
-}[] = [
-    {
-        value: "Maandelijks abonnement",
-        description: "Vast bedrag per maand, altijd up-to-date.",
-        icon: CalendarClock,
-    },
-    {
-        value: "Eenmalig + hosting",
-        description: "Eén keer betalen, wij regelen de hosting.",
-        icon: Server,
-    },
-    {
-        value: "Ik wil eerst even praten",
-        description: "Liever eerst overleggen? Wij bellen je gratis.",
-        icon: MessageCircle,
-    },
-];
+}[] {
+    return [
+        {
+            value: "Wij bouwen het",
+            description: `Wij bouwen je complete salonwebsite, vanaf ${formatEuro(pricing.websiteBase)}.`,
+            icon: Hammer,
+        },
+        {
+            value: "Maatwerk",
+            description: "Iets bijzonders in je hoofd? We maken een voorstel op maat.",
+            icon: Wand2,
+        },
+    ];
+}
+
+function getBillingOptions(pricing: Pricing): {
+    value: Billing;
+    label: string;
+    description: string;
+    icon: LucideIcon;
+}[] {
+    const splitPerMonth = splitWebsiteMonthly(pricing) + pricing.subMonthly;
+    return [
+        {
+            value: "monthly",
+            label: "Maandelijks",
+            description: `${formatEuro(splitPerMonth)}/mnd in jaar 1 (website gespreid + abonnement), daarna ${formatEuro(pricing.subMonthly)}/mnd.`,
+            icon: CalendarClock,
+        },
+        {
+            value: "yearly",
+            label: "Jaarlijks — beste deal",
+            description: `Website in één keer (${formatEuro(pricing.websiteUpfront)}) + ${formatEuro(pricing.subYearly)}/jaar. Dat zijn 2 maanden gratis.`,
+            icon: BadgePercent,
+        },
+    ];
+}
 
 const STEP_FIELDS: Record<number, (keyof OrderFormValues)[]> = {
     0: ["salonType"],
@@ -102,9 +131,10 @@ const STEP_FIELDS: Record<number, (keyof OrderFormValues)[]> = {
     2: ["hasDomain", "customDomain"],
     3: ["address"],
     4: ["package"],
+    5: ["billing"],
 };
 
-export function OrderForm() {
+export function OrderForm({ pricing }: { pricing: Pricing }) {
     const router = useRouter();
     const { data: session, isPending } = authClient.useSession();
 
@@ -236,6 +266,11 @@ export function OrderForm() {
 
     function selectPackage(value: Package) {
         setValue("package", value, { shouldValidate: true });
+        setTimeout(() => goNext(), 300);
+    }
+
+    function selectBilling(value: Billing) {
+        setValue("billing", value, { shouldValidate: true });
         setTimeout(() => goNext(), 300);
     }
 
@@ -526,7 +561,7 @@ export function OrderForm() {
                 return (
                     <div className="flex flex-col gap-4">
                         <div className="flex flex-col gap-3">
-                            {PACKAGE_OPTIONS.map((option) => (
+                            {getPackageOptions(pricing).map((option) => (
                                 <ChoiceBlock
                                     key={option.value}
                                     icon={option.icon}
@@ -540,6 +575,33 @@ export function OrderForm() {
                         {errors.package ? (
                             <p className="text-sm text-destructive">
                                 {errors.package.message}
+                            </p>
+                        ) : null}
+                    </div>
+                );
+
+            case 5:
+                return (
+                    <div className="flex flex-col gap-4">
+                        <div className="flex flex-col gap-3">
+                            {getBillingOptions(pricing).map((option) => (
+                                <ChoiceBlock
+                                    key={option.value}
+                                    icon={option.icon}
+                                    label={option.label}
+                                    description={option.description}
+                                    selected={values.billing === option.value}
+                                    onSelect={() => selectBilling(option.value)}
+                                />
+                            ))}
+                        </div>
+                        <p className="rounded-xl bg-primary/5 px-4 py-3 text-sm font-medium text-primary">
+                            0% commissie op boekingen — elke euro die je klanten
+                            betalen is voor jou.
+                        </p>
+                        {errors.billing ? (
+                            <p className="text-sm text-destructive">
+                                {errors.billing.message}
                             </p>
                         ) : null}
                     </div>
@@ -575,6 +637,11 @@ function SummaryStep({
         },
         { label: "Adres", value: values.address || null, step: 3 },
         { label: "Pakket", value: values.package ?? null, step: 4 },
+        {
+            label: "Betaling",
+            value: values.billing ? BILLING_LABELS[values.billing] : null,
+            step: 5,
+        },
     ];
 
     const accountRows: { label: string; value: string | null }[] = [
