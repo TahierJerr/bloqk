@@ -224,6 +224,27 @@ export default async function AdminOrderPage({
                                     )}
                                 </dd>
                             </div>
+                            <div className="sm:col-span-2">
+                                <dt className="text-muted-foreground">
+                                    Cloudflare-nameservers (gaan mee in de overdracht)
+                                </dt>
+                                <dd className="font-medium">
+                                    {order.cloudflareNameservers.length > 0 ? (
+                                        <span className="flex flex-wrap gap-1.5">
+                                            {order.cloudflareNameservers.map((ns) => (
+                                                <code
+                                                    key={ns}
+                                                    className="rounded bg-muted px-1.5 py-0.5 text-xs"
+                                                >
+                                                    {ns}
+                                                </code>
+                                            ))}
+                                        </span>
+                                    ) : (
+                                        "—"
+                                    )}
+                                </dd>
+                            </div>
                         </dl>
                     </DetailSection>
                 ) : null}

@@ -4,7 +4,7 @@ import { z } from "zod";
 import prismadb from "@/lib/prismadb";
 import { getSessionAndLatestOrder } from "@/lib/order";
 import { createZoneWithDns } from "@/lib/cloudflare";
-import { requestDomainTransfer } from "@/lib/transip";
+import { requestDomainTransfer, setNameservers } from "@/lib/transip";
 
 const domainChoiceSchema = z.discriminatedUnion("choice", [
   z.object({
@@ -76,24 +76,43 @@ export async function POST(req: NextRequest) {
 
     // Met verhuiscode (en nog geen lopende aanvraag): zone + overdracht
     if (eppCode && !order.transferRequestedAt) {
+      // 1. Cloudflare-zone (idempotent) levert ook de toegewezen nameservers
       let zoneId: string | null = order.cloudflareZoneId;
+      let nameServers: string[] = order.cloudflareNameservers;
       try {
-        zoneId ??= await createZoneWithDns(domain);
+        const zone = await createZoneWithDns(domain);
+        if (zone) {
+          zoneId = zone.zoneId;
+          nameServers = zone.nameServers;
+        }
       } catch (cfError) {
         console.error(`Cloudflare-zone voor ${domain} mislukt:`, cfError);
       }
 
+      // 2. Overdracht aanvragen mét de Cloudflare-nameservers, zodat ze
+      // direct bij afronding actief zijn
       let transferRequested = false;
       try {
-        transferRequested = await requestDomainTransfer(domain, eppCode);
+        transferRequested = await requestDomainTransfer(domain, eppCode, nameServers);
       } catch (transferError) {
         console.error(`Overdracht van ${domain} mislukt:`, transferError);
+      }
+
+      // 3. Geweigerde overdracht kan betekenen dat het domein al in ons
+      // account zit; dan zetten we de nameservers direct
+      if (!transferRequested && nameServers.length > 0) {
+        try {
+          await setNameservers(domain, nameServers);
+        } catch (nsError) {
+          console.error(`Nameservers voor ${domain} niet gezet:`, nsError);
+        }
       }
 
       await prismadb.order.update({
         where: { id: order.id },
         data: {
           ...(zoneId ? { cloudflareZoneId: zoneId } : {}),
+          ...(nameServers.length > 0 ? { cloudflareNameservers: nameServers } : {}),
           ...(transferRequested ? { transferRequestedAt: new Date() } : {}),
         },
       });

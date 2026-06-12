@@ -326,9 +326,11 @@ model Order {
   // Verhuiscode voor de domeinoverdracht naar ons TransIP-account
   eppCode      String?
   // Cloudflare-zone die we voor het domein hebben aangemaakt
-  cloudflareZoneId    String?
+  cloudflareZoneId      String?
+  // Door Cloudflare toegewezen nameservers (gaan mee in de overdracht)
+  cloudflareNameservers String[]  @default([])
   // Moment waarop de overdracht bij TransIP is aangevraagd
-  transferRequestedAt DateTime?
+  transferRequestedAt   DateTime?
 
   userId    String
   user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
