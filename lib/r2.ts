@@ -44,7 +44,10 @@ export async function createDomainFolder(domain: string) {
     new PutObjectCommand({
       Bucket: r2.bucket,
       Key: `${domain}/.keep`,
-      Body: "",
+      // Lege marker; expliciete lengte voorkomt de SDK-waarschuwing
+      // over een stream van onbekende lengte
+      Body: new Uint8Array(0),
+      ContentLength: 0,
       ContentType: "text/plain",
     }),
   );
