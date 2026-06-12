@@ -3,6 +3,7 @@
 
 import { Mail, Phone, Video } from "lucide-react";
 import type { PaymentPlan } from "@/lib/pricing";
+import type { DnsRecord } from "@/lib/dns";
 import type { ContactMethod } from "@/lib/intake-schema";
 
 export type OrderProgressInfo = {
@@ -17,6 +18,13 @@ export type OrderProgressInfo = {
     lastPaymentStatus: string | null;
     // Server-side berekend uit de actuele prijsconfiguratie
     payment: PaymentPlan | null;
+    // Domeinbeheer na betaling (alleen relevant bij een eigen domein)
+    domain: string | null;
+    domainSource: string | null;
+    dnsChoice: string | null;
+    hasEppCode: boolean;
+    transferRequested: boolean;
+    dnsRecords: DnsRecord[];
 };
 
 export const STEPS = [

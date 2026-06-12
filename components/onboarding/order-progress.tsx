@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Check, PartyPopper } from "lucide-react";
+import { Check } from "lucide-react";
 import {
     Dialog,
     DialogContent,
@@ -26,6 +26,7 @@ import { CancelledScreen } from "./progress/cancelled-screen";
 import { PendingStep } from "./progress/pending-step";
 import { PreviewStep } from "./progress/preview-step";
 import { PaymentStep } from "./progress/payment-step";
+import { PaidStep } from "./progress/paid-step";
 
 export type { OrderProgressInfo } from "./progress/progress-config";
 
@@ -155,16 +156,7 @@ export function OrderProgress({ order }: { order: OrderProgressInfo }) {
                 );
 
             case "PAID":
-                return (
-                    <div className="flex items-start gap-3">
-                        <PartyPopper className="mt-0.5 size-5 shrink-0 text-primary" />
-                        <p className="text-sm leading-relaxed text-muted-foreground">
-                            Betaling ontvangen! We zetten {order.salonName} nu live.
-                            Je krijgt bericht zodra alles online staat, daarna opent
-                            je dashboard hier vanzelf.
-                        </p>
-                    </div>
-                );
+                return <PaidStep order={order} />;
 
             default:
                 return null;

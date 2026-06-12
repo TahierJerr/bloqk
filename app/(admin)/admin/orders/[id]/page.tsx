@@ -174,6 +174,60 @@ export default async function AdminOrderPage({
                     </dl>
                 </DetailSection>
 
+                {/* Domeinbeheer (alleen bij een meegebracht eigen domein) */}
+                {order.domainSource === "existing" && salon?.domain ? (
+                    <DetailSection title={`Domeinbeheer — ${salon.domain}`}>
+                        <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+                            <div>
+                                <dt className="text-muted-foreground">Keuze van de klant</dt>
+                                <dd className="font-medium">
+                                    {order.dnsChoice === "managed"
+                                        ? "Bloqk beheert het domein"
+                                        : order.dnsChoice === "self"
+                                            ? "Klant beheert zelf (DNS-instellingen getoond)"
+                                            : "Nog geen keuze gemaakt"}
+                                </dd>
+                            </div>
+                            <div>
+                                <dt className="text-muted-foreground">Verhuiscode (EPP)</dt>
+                                <dd className="font-medium">
+                                    {order.eppCode ? (
+                                        <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                                            {order.eppCode}
+                                        </code>
+                                    ) : (
+                                        "Nog niet ontvangen"
+                                    )}
+                                </dd>
+                            </div>
+                            <div>
+                                <dt className="text-muted-foreground">Overdracht TransIP</dt>
+                                <dd className="font-medium">
+                                    {order.transferRequestedAt
+                                        ? `Aangevraagd op ${dateFormatter.format(order.transferRequestedAt)}`
+                                        : order.dnsChoice === "managed" && order.eppCode
+                                            ? "⚠ Nog niet gelukt — handmatig oppakken"
+                                            : "—"}
+                                </dd>
+                            </div>
+                            <div>
+                                <dt className="text-muted-foreground">Cloudflare-zone</dt>
+                                <dd className="font-medium">
+                                    {order.cloudflareZoneId ? (
+                                        <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                                            {order.cloudflareZoneId}
+                                        </code>
+                                    ) : order.dnsChoice === "managed" && order.eppCode ? (
+                                        "⚠ Nog niet aangemaakt"
+                                    ) : (
+                                        "—"
+                                    )}
+                                </dd>
+                            </div>
+                        </dl>
+                    </DetailSection>
+                ) : null}
+
                 {order.feedbackReason ? (
                     <DetailSection title="Laatste feedback op de preview">
                         <p className="text-sm font-medium">

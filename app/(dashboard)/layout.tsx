@@ -4,6 +4,7 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { auth } from "@/lib/auth";
 import { getMollieClient } from "@/lib/mollie";
 import { computePaymentPlan } from "@/lib/pricing";
+import { getDnsRecords } from "@/lib/dns";
 import { getPricingConfig } from "@/lib/pricing-server";
 import prismadb from "@/lib/prismadb";
 import { handleFirstPaymentPaid } from "@/lib/subscriptions";
@@ -95,6 +96,12 @@ export default async function DashboardLayout({
                 ? computePaymentPlan(order, await getPricingConfig())
                 : null;
 
+        // Domein van de salon, voor de domeinbeheer-keuze na betaling
+        const salon = await prismadb.salon.findUnique({
+            where: { ownerId: session.user.id },
+            select: { domain: true },
+        });
+
         return (
             <OrderProgress
                 order={{
@@ -107,6 +114,12 @@ export default async function DashboardLayout({
                     contactMethod: order.contactMethod,
                     billing: order.billing,
                     lastPaymentStatus: order.lastPaymentStatus,
+                    domain: salon?.domain ?? null,
+                    domainSource: order.domainSource,
+                    dnsChoice: order.dnsChoice,
+                    hasEppCode: Boolean(order.eppCode),
+                    transferRequested: Boolean(order.transferRequestedAt),
+                    dnsRecords: getDnsRecords(),
                     payment,
                 }}
             />

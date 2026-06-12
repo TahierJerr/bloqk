@@ -59,14 +59,17 @@ export async function POST(req: NextRequest) {
         // blijven beide leeg tot er een domein wordt gekozen
         let domain: string | null = null;
         let slug: string | null = null;
+        let domainSource: string | null = null;
         if (hasDomain === "yes" && customDomain) {
             // Strip protocol, www. en eventueel pad zodat de database mooi schoon blijft
             domain = customDomain.trim().toLowerCase()
                 .replace(/^(https?:\/\/)?(www\.)?/, '')
                 .replace(/\/.*$/, '');
+            domainSource = "existing";
         } else if (hasDomain === "no" && newDomain) {
             // Gekozen suggestie voor een nieuw te registreren domein
             domain = newDomain.trim().toLowerCase();
+            domainSource = "suggestion";
         }
         if (domain) {
             // De slug is het domein zonder TLD ("mijn-salon.nl" -> "mijn-salon")
@@ -111,6 +114,7 @@ export async function POST(req: NextRequest) {
                     address,
                     package: pkg,
                     billing,
+                    domainSource,
                     userId,
                 },
             });

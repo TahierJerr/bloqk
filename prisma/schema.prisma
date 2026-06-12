@@ -319,6 +319,17 @@ model Order {
   // Abonnementen die na de eerste betaling zijn gestart
   mollieSubscriptionIds String[] @default([])
 
+  // Herkomst van het domein: "existing" (eigen domein) | "suggestion" (gekozen suggestie)
+  domainSource String?
+  // Domeinbeheer na betaling: "managed" (Bloqk beheert) | "self" (klant beheert)
+  dnsChoice    String?
+  // Verhuiscode voor de domeinoverdracht naar ons TransIP-account
+  eppCode      String?
+  // Cloudflare-zone die we voor het domein hebben aangemaakt
+  cloudflareZoneId    String?
+  // Moment waarop de overdracht bij TransIP is aangevraagd
+  transferRequestedAt DateTime?
+
   userId    String
   user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
