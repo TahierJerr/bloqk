@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { rateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import prismadb from "@/lib/prismadb";
@@ -10,6 +11,9 @@ const setPasswordSchema = z.object({
 // Koppelt een wachtwoord aan een account dat via e-mailcode is aangemaakt,
 // zodat klanten na de onboarding ook met e-mail + wachtwoord kunnen inloggen
 export async function POST(req: NextRequest) {
+  const limited = await rateLimit(req, "set-password", RATE_LIMITS.strict);
+  if (limited) return limited;
+
     try {
         const session = await auth.api.getSession({ headers: req.headers });
         if (!session?.user) {

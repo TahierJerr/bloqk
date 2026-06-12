@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { rateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import prismadb from "@/lib/prismadb";
@@ -12,6 +13,9 @@ const bootstrapSchema = z.object({
 // Maakt het allereerste superadmin-account aan. Zodra er een superadmin
 // bestaat, is deze route (en de /sign-up pagina) definitief dicht.
 export async function POST(req: NextRequest) {
+  const limited = await rateLimit(req, "admin-bootstrap", RATE_LIMITS.strict);
+  if (limited) return limited;
+
     try {
         const superAdminCount = await prismadb.user.count({
             where: { role: "SUPERADMIN" },

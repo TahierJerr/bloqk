@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { rateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import prismadb from "@/lib/prismadb";
@@ -16,6 +17,9 @@ const settingsSchema = z.object({
 });
 
 export async function PATCH(req: NextRequest) {
+  const limited = await rateLimit(req, "salon-settings", RATE_LIMITS.standard);
+  if (limited) return limited;
+
     try {
         const session = await auth.api.getSession({ headers: req.headers });
         if (!session?.user) {

@@ -9,6 +9,9 @@ type ChoiceBlockProps = {
     label: string;
     description?: string;
     selected: boolean;
+    // Zichtbaar maar (nog) niet te kiezen, bijv. "Maatwerk"
+    disabled?: boolean;
+    badge?: string;
     onSelect: () => void;
 };
 
@@ -17,20 +20,26 @@ export function ChoiceBlock({
     label,
     description,
     selected,
+    disabled = false,
+    badge,
     onSelect,
 }: ChoiceBlockProps) {
     return (
         <button
             type="button"
-            onClick={onSelect}
+            onClick={disabled ? undefined : onSelect}
             aria-pressed={selected}
+            aria-disabled={disabled}
+            disabled={disabled}
             className={cn(
                 "group relative flex min-h-24 w-full cursor-pointer flex-col items-start gap-2 rounded-xl border-2 p-3 text-left transition-all duration-200 sm:min-h-30 sm:gap-2.5",
                 "hover:-translate-y-0.5 hover:shadow-md motion-reduce:transform-none",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                 selected
                     ? "border-primary bg-primary/5 shadow-sm"
-                    : "border-border bg-card hover:border-primary/40"
+                    : "border-border bg-card hover:border-primary/40",
+                disabled &&
+                    "cursor-not-allowed border-dashed opacity-60 hover:translate-y-0 hover:border-border hover:shadow-none"
             )}
         >
             <span
@@ -45,7 +54,14 @@ export function ChoiceBlock({
             </span>
 
             <span className="flex flex-col gap-0.5 mt-1 sm:mt-0">
-                <span className="text-sm font-semibold leading-snug">{label}</span>
+                <span className="text-sm font-semibold leading-snug">
+                    {label}
+                    {badge ? (
+                        <span className="ml-2 inline-block rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground align-middle">
+                            {badge}
+                        </span>
+                    ) : null}
+                </span>
                 {description ? (
                     <span className="text-xs leading-normal text-muted-foreground">
                         {description}

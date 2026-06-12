@@ -519,12 +519,16 @@ export function OrderForm({ pricing }: { pricing: Pricing }) {
             <div className="flex flex-col gap-3">
               {getPackageOptions(pricing).map((option) => (
                 <ChoiceBlock
-                  key={option.value}
+                  key={option.label}
                   icon={option.icon}
-                  label={option.value}
+                  label={option.label}
                   description={option.description}
-                  selected={values.package === option.value}
-                  onSelect={() => selectPackage(option.value)}
+                  selected={option.value !== null && values.package === option.value}
+                  disabled={option.disabled ?? false}
+                  {...(option.badge ? { badge: option.badge } : {})}
+                  onSelect={() => {
+                    if (option.value) selectPackage(option.value);
+                  }}
                 />
               ))}
             </div>

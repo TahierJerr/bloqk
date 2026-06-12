@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { rateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { render } from "@react-email/render";
 import prismadb from "@/lib/prismadb";
 import { getSessionAndLatestOrder } from "@/lib/order";
@@ -13,6 +14,9 @@ import { WizardCompleteEmail } from "@/emails/wizard-complete-notification";
 import { siteConfig } from "@/lib/site";
 
 export async function POST(req: NextRequest) {
+  const limited = await rateLimit(req, "order-intake", RATE_LIMITS.sensitive);
+  if (limited) return limited;
+
     try {
         const ctx = await getSessionAndLatestOrder(req.headers);
         if (!ctx) {

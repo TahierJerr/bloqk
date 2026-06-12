@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { rateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import prismadb from "@/lib/prismadb";
@@ -10,6 +11,9 @@ const acceptSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+  const limited = await rateLimit(req, "accept-invite", RATE_LIMITS.strict);
+  if (limited) return limited;
+
     try {
         const parsed = acceptSchema.safeParse(await req.json());
         if (!parsed.success) {

@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { rateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { randomBytes } from "crypto";
 import { z } from "zod";
 import { render } from "@react-email/render";
@@ -14,6 +15,9 @@ const inviteSchema = z.object({
 const INVITE_VALID_DAYS = 7;
 
 export async function POST(req: NextRequest) {
+  const limited = await rateLimit(req, "staff-invite", RATE_LIMITS.email);
+  if (limited) return limited;
+
     try {
         const session = await auth.api.getSession({ headers: req.headers });
         if (!session?.user) {

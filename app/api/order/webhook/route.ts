@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { rateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import prismadb from "@/lib/prismadb";
 import { getMollieClient } from "@/lib/mollie";
 import { handleFirstPaymentPaid } from "@/lib/subscriptions";
@@ -16,6 +17,9 @@ import { handleFirstPaymentPaid } from "@/lib/subscriptions";
 //   expired   , checkout verlopen: idem
 //   failed    , betaling mislukt: idem
 export async function POST(req: NextRequest) {
+  const limited = await rateLimit(req, "mollie-webhook", RATE_LIMITS.webhook);
+  if (limited) return limited;
+
   try {
     const form = await req.formData();
     const paymentId = form.get("id");

@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { rateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { auth } from "@/lib/auth";
 import prismadb from "@/lib/prismadb";
 
@@ -6,6 +7,9 @@ export async function DELETE(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
+  const limited = await rateLimit(req, "staff-delete", RATE_LIMITS.standard);
+  if (limited) return limited;
+
     try {
         const session = await auth.api.getSession({ headers: req.headers });
         if (!session?.user) {

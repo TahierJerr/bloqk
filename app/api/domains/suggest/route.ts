@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { rateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { suggestAvailableDomains } from "@/lib/domains";
@@ -8,6 +9,9 @@ const suggestSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+  const limited = await rateLimit(req, "domains-suggest", RATE_LIMITS.sensitive);
+  if (limited) return limited;
+
     try {
         // Alleen voor ingelogde gebruikers (de onboarding zit achter de
         // auth wall), zodat de TransIP-API niet vrij aan te roepen is

@@ -74,21 +74,30 @@ export const SALON_TYPE_ICONS: Record<SalonType, LucideIcon> = {
 };
 
 export function getPackageOptions(pricing: Pricing): {
-  value: Package;
+  // null = (nog) niet te kiezen optie, alleen ter info
+  value: Package | null;
+  label: string;
   description: string;
   icon: LucideIcon;
+  disabled?: boolean;
+  badge?: string;
 }[] {
   return [
     {
       value: "Wij bouwen het",
+      label: "Wij bouwen het",
       description: `Wij bouwen je complete salonwebsite, vanaf ${formatEuro(pricing.websiteBase)}.`,
       icon: Hammer,
     },
     {
-      value: "Maatwerk",
+      // Maatwerk ondersteunen we nog niet; tonen we wel alvast
+      value: null,
+      label: "Maatwerk",
       description:
-        "Iets bijzonders in je hoofd? We maken een voorstel op maat.",
+        "Iets volledig op maat? Hier werken we nog aan — binnenkort beschikbaar.",
       icon: Wand2,
+      disabled: true,
+      badge: "Binnenkort",
     },
   ];
 }

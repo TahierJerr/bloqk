@@ -1,10 +1,12 @@
 import { NextRequest } from "next/server";
+import { rateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { render } from "@react-email/render";
 import prismadb from "@/lib/prismadb";
 import { mailFrom, transporter } from "@/lib/mail";
 import { orderSchema } from "@/lib/order-schema";
 import { OrderConfirmationEmail } from "@/emails/order-confirmation";
-import { auth } from "@/lib/auth"; 
+import { createDomainFolder } from "@/lib/r2";
+import { auth } from "@/lib/auth";
 
 // Helper function to create a URL-friendly slug (e.g. "Studio Knip" -> "studio-knip")
 function slugify(text: string) {
@@ -25,6 +27,9 @@ function extractCity(address: string | undefined) {
 }
 
 export async function POST(req: NextRequest) {
+  const limited = await rateLimit(req, "start", RATE_LIMITS.strict);
+  if (limited) return limited;
+
     try {
         // 1. Verify Authentication (This gives us userId, name, and email)
         const session = await auth.api.getSession({
@@ -112,6 +117,16 @@ export async function POST(req: NextRequest) {
 
             return { salon, staff, order };
         });
+
+        // Map in Cloudflare R2 voor de bestanden van deze website, genoemd
+        // naar het domein incl. TLD. Mag de aanvraag niet laten falen.
+        if (domain) {
+            try {
+                await createDomainFolder(domain);
+            } catch (r2Error) {
+                console.error(`R2-map voor "${domain}" kon niet worden aangemaakt:`, r2Error);
+            }
+        }
 
         // 4. Bevestiging naar de klant. Support krijgt pas bericht zodra de
         // intake (wizard of contactverzoek) is afgerond, via /api/order/intake
