@@ -11,7 +11,6 @@ export const SALON_TYPES = [
 
 export const PACKAGES = [
     "Wij bouwen het",
-    "Maatwerk"
 ] as const;
 
 export type SalonType = (typeof SALON_TYPES)[number];
@@ -22,7 +21,6 @@ export type Package = (typeof PACKAGES)[number];
 // we een betaallink na het gesprek.
 export const PACKAGE_PRICES: Record<Package, string | null> = {
     "Wij bouwen het": "149.00",
-    "Maatwerk": null,
 };
 
 export const SUBSCRIPTION_PRICES = {
