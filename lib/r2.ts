@@ -19,19 +19,24 @@ function getR2() {
   const host = jurisdiction
     ? `${accountId}.${jurisdiction}.r2.cloudflarestorage.com`
     : `${accountId}.r2.cloudflarestorage.com`;
+  const endpoint = `https://${host}`;
 
   client ??= new S3Client({
     region: "auto",
-    endpoint: `https://${host}`,
+    endpoint,
     credentials: { accessKeyId, secretAccessKey },
   });
-  return { client, bucket };
+  return { client, bucket, endpoint, jurisdiction: jurisdiction || "(geen)" };
 }
 
 /**
  * Maakt in R2 een "map" aan voor een domein (incl. TLD), bijv.
  * "mijn-salon.nl/". R2/S3 kent geen echte mappen, dus we zetten een
  * lege marker neer zodat de prefix bestaat en zichtbaar is.
+ *
+ * Niet-fataal: faalt dit (bijv. token zonder schrijfrechten), dan
+ * loggen we de actieve config (zonder secrets) zodat duidelijk is
+ * welke endpoint/bucket/jurisdictie er gebruikt werd.
  */
 export async function createDomainFolder(domain: string) {
   const r2 = getR2();
@@ -40,15 +45,25 @@ export async function createDomainFolder(domain: string) {
     return;
   }
 
-  await r2.client.send(
-    new PutObjectCommand({
-      Bucket: r2.bucket,
-      Key: `${domain}/.keep`,
-      // Lege marker; expliciete lengte voorkomt de SDK-waarschuwing
-      // over een stream van onbekende lengte
-      Body: new Uint8Array(0),
-      ContentLength: 0,
-      ContentType: "text/plain",
-    }),
-  );
+  try {
+    await r2.client.send(
+      new PutObjectCommand({
+        Bucket: r2.bucket,
+        Key: `${domain}/.keep`,
+        // Lege marker; expliciete lengte voorkomt de SDK-waarschuwing
+        // over een stream van onbekende lengte
+        Body: new Uint8Array(0),
+        ContentLength: 0,
+        ContentType: "text/plain",
+      }),
+    );
+  } catch (error) {
+    const code = (error as { Code?: string }).Code ?? "onbekend";
+    console.error(
+      `R2-map voor "${domain}" mislukt (${code}). Actieve config: ` +
+        `endpoint=${r2.endpoint} bucket=${r2.bucket} jurisdictie=${r2.jurisdiction}. ` +
+        `AccessDenied => token mist 'Object Read & Write' of is niet aan deze bucket/jurisdictie gekoppeld.`,
+    );
+    throw error;
+  }
 }
